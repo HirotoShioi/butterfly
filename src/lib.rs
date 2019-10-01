@@ -5,19 +5,29 @@ extern crate scraper;
 use kanaria::UCSStr;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
+use std::fmt;
+
+const WEBSITE_CHARSET: &str = "Shift-JIS";
 
 type Id = usize;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct Butterfly {
+    /// Url of an image
     img_src: String,
+    /// Japanese name
     jp_name: String,
+    /// English name
     eng_name: String,
+    /// Background color in 6 digit Hex
     bgcolor: String,
 }
 
 impl Butterfly {
-    fn new_src(img_src: &str, bgcolor: &str) -> Butterfly {
+    ///Creates an instance of `Butterfly`
+    ///
+    /// `jp_name` and `eng_name` is empty due to the structure of the website
+    fn new(img_src: &str, bgcolor: &str) -> Butterfly {
         let jp_name = String::new();
         let eng_name = String::new();
         Butterfly {
@@ -28,8 +38,9 @@ impl Butterfly {
         }
     }
 
+    ///Add both English and Japanese name to given `Butterfly`
     fn add_names(&mut self, jp_name: &str, eng_name: &str) -> bool {
-        if self.jp_name.len() <= 0 {
+        if self.jp_name.is_empty() {
             let fixed_eng_name = UCSStr::from_str(eng_name).narrow().to_string();
             let fixed_jp_name = UCSStr::from_str(&jp_name)
                 .wide()
@@ -44,52 +55,84 @@ impl Butterfly {
     }
 }
 
+
 #[derive(Debug)]
-pub struct Region {
+pub enum RegionError {
+    ImageSourceNotFound,
+    TextNotFound,
+    InvalidIndexButterflyNotFound,
+    FailedToFetchHTML,
+}
+
+impl std::error::Error for RegionError {}
+
+impl fmt::Display for RegionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        let error_message = match self {
+            RegionError::ImageSourceNotFound => "Image source not found",
+            RegionError::FailedToFetchHTML => "Failed to fetch html",
+            RegionError::InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
+            RegionError::TextNotFound => "Text description of a butterfly could not be extracted",
+        };
+        write!(f, "{}", error_message)
+    }
+}
+
+/// Collections of butterflies categorized by its regions
+#[derive(Debug)]
+pub struct ButterflyRegion {
+    /// Name of the region
     name: String,
+    /// Url of region page
     url: String,
+    /// Collections of butterflies
     butterflies: HashMap<Id, Butterfly>,
 }
 
-impl Region {
-    pub fn new(name: &str, url: &str) -> Region {
+impl ButterflyRegion {
+    /// Create an instance of `ButterflyRegion`
+    pub fn new(name: &str, url: &str) -> ButterflyRegion {
         let butterflies = HashMap::new();
-        Region {
+        ButterflyRegion {
             name: name.to_string(),
             url: url.to_string(),
             butterflies,
         }
     }
 
-    pub fn start(&mut self) -> Result<&mut Self, reqwest::Error> {
-        let body = request_html(&self.url)?;
-        self.parse_page(&body);
+    /// Extract informations of butterflies from `url`
+    pub fn start(&mut self) -> Result<&mut Self, RegionError> {
+        let body = request_html(&self.url).map_err(|_e| RegionError::FailedToFetchHTML)?;
+        self.parse_page(&body)?;
         Ok(self)
     }
 
-    fn add_src(&mut self, img_src: &str, color: &str) -> Option<&mut Region> {
+    /// Insert new `Butterfly` to `butterflies`
+    fn insert_butterfly(&mut self, img_src: &str, color: &str) -> Option<&mut ButterflyRegion> {
         let id = self.butterflies.len();
-        match self
-            .butterflies
-            .insert(id, Butterfly::new_src(img_src, color))
-        {
+        match self.butterflies.insert(id, Butterfly::new(img_src, color)) {
             Some(_old_val) => None,
             None => Some(self),
         }
     }
 
-    fn add_names(&mut self, jp_name: &str, eng_name: &str, id: usize) -> Option<&mut Region> {
+    /// Lookup `Butterfly` with given `id`, and update its name
+    fn add_names(&mut self, jp_name: &str, eng_name: &str, id: usize) -> bool {
         match self.butterflies.get_mut(&id) {
             Some(butterfly) => {
                 butterfly.add_names(jp_name, eng_name);
-                Some(self)
+                true
             }
-            None => None,
+            None => false,
         }
     }
 
-    fn parse_page(&mut self, html: &str) -> &mut Region {
+    // Return Result
+    ///Parse given html and extract information from it
+    fn parse_page(&mut self, html: &str) -> Result<&mut ButterflyRegion, RegionError> {
         let fragment = Html::parse_document(html);
+
+        // Selectors we would use for parsing
         let table_selector = Selector::parse("table").unwrap();
         let tbody_selector = Selector::parse("tbody").unwrap();
         let tr_selector = Selector::parse("tr").unwrap();
@@ -103,19 +146,33 @@ impl Region {
                 for tr in tbody.select(&tr_selector) {
                     if !is_title_section(&tr) {
                         for td in tr.select(&td_selector) {
+                            // If a cell has img element, then extract img source
+                            // as well as background color
                             if let Some(img) = td.select(&img_selector).next() {
                                 if let Some(src) = img.value().attr("src") {
                                     let mut c = "#ffffff";
                                     if let Some(color) = td.value().attr("bgcolor") {
                                         c = color
                                     }
-                                    self.add_src(src, c);
+                                    self.insert_butterfly(src, c);
+                                } else {
+                                    //throw error
+                                    return Err(RegionError::ImageSourceNotFound);
                                 }
+                            // If a cell does not have a img source, then extract
+                            // names from it
                             } else {
+                                // Ignore empty cell
                                 if !is_empty_text(td.clone().text().collect()) {
-                                    let (jp_name, eng_name) = get_jp_en_name(td);
-                                    self.add_names(&jp_name, &eng_name, name_id);
-                                    name_id = name_id + 1;
+                                    if let Some((jp_name, eng_name)) = get_jp_en_name(td) {
+                                        if self.add_names(&jp_name, &eng_name, name_id) {
+                                            name_id += 1;
+                                        } else {
+                                            return Err(RegionError::InvalidIndexButterflyNotFound);
+                                        };
+                                    } else {
+                                        return Err(RegionError::TextNotFound);
+                                    };
                                 }
                             };
                         }
@@ -124,35 +181,17 @@ impl Region {
             }
         }
 
-        self
+        Ok(self)
     }
 }
 
+///Fetch content of given `url`
 pub fn request_html(url: &str) -> Result<String, reqwest::Error> {
     let mut req = reqwest::get(url)?;
-    let body = req.text_with_charset("Shift-JIS");
-    body
+    req.text_with_charset(WEBSITE_CHARSET)
 }
 
-fn strip_white_spaces(text: &str) -> String {
-    let mut text = text.chars().peekable();
-
-    loop {
-        if let Some(c) = text.peek() {
-            if c.is_ascii_whitespace() {
-                text.next();
-                continue;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-
-    text.collect()
-}
-
+///Check if given tr set are title cells by checking its colspan attributes
 fn is_title_section(element: &ElementRef) -> bool {
     let mut is_title = false;
     let td_selector = Selector::parse("td").unwrap();
@@ -167,11 +206,13 @@ fn is_title_section(element: &ElementRef) -> bool {
     is_title
 }
 
+///Checks if given `String` is consisted by whitespaces
 fn is_empty_text(str: String) -> bool {
-    strip_white_spaces(&str).is_empty()
+    str.trim_start().is_empty()
 }
 
-fn get_jp_en_name(td: ElementRef) -> (String, String) {
+///Extract both Japanese and English name from given `ElementRef`
+fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
     let td = td.text().collect::<String>();
 
     let mut names = vec![];
@@ -182,21 +223,26 @@ fn get_jp_en_name(td: ElementRef) -> (String, String) {
     let jp_name;
     let eng_name;
 
+    //Handling exceptions
     if names == vec!["ヒメアカタテハCynthia_cardui"] {
-        jp_name = "ヒメアカタテハ".to_string();
-        eng_name = "Cynthia_cardui".to_string();
+        jp_name = Some("ヒメアカタテハ");
+        eng_name = Some("Cynthia_cardui");
     } else if names == vec!["ツマムラサキマダラ♀Euploea_mulcibe"] {
-        jp_name = "ツマムラサキマダラ♀".to_string();
-        eng_name = "Euploea_mulcibe".to_string();
-    } else if names[0] == "ミイロタイマイ".to_string() {
-        jp_name = "ミイロタイマイ".to_string();
-        eng_name = "Graphium_weiskei".to_string();
+        jp_name = Some("ツマムラサキマダラ♀");
+        eng_name = Some("Euploea_mulcibe");
+    } else if names.get(0).cloned() == Some("ミイロタイマイ") {
+        jp_name = Some("ミイロタイマイ");
+        eng_name = Some("Graphium_weiskei");
     } else {
-        jp_name = names[0].to_string();
-        eng_name = names[1].to_string();
+        jp_name = names.get(0).cloned();
+        eng_name = names.get(1).cloned();
     }
 
-    let eng_name = strip_white_spaces(&eng_name).trim_end().to_string();
-
-    (jp_name, eng_name)
+    match (jp_name, eng_name) {
+        (Some(jp), Some(eng)) => {
+            let eng = eng.trim_end().trim_start().to_string();
+            Some((jp.to_string(), eng))
+        }
+        _ => None,
+    }
 }

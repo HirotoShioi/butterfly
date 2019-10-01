@@ -1,31 +1,33 @@
-use scrape_test::Region;
+use scrape_test::ButterflyRegion;
 
 fn main() {
-    let mut butterfly_pages = vec![
-        Region::new(
+    let mut regions = vec![
+        ButterflyRegion::new(
             "旧北区",
             "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall",
         ),
-        Region::new(
+        ButterflyRegion::new(
             "新北区",
             "http://biokite.com/worldbutterfly/butterfly-NArc.htm#NAsa",
         ),
-        Region::new(
+        ButterflyRegion::new(
             "新熱帯区",
             "http://biokite.com/worldbutterfly/butterfly-NTro.htm#NTmap",
         ),
-        Region::new(
+        ButterflyRegion::new(
             "インド・オーストラリア区",
             "http://biokite.com/worldbutterfly/butterfly-IOrs.htm#IOmap",
         ),
-        Region::new(
+        ButterflyRegion::new(
             "熱帯アフリカの蝶",
             "http://biokite.com/worldbutterfly/butterfly-TAfr.htm#TAmaps",
         ),
     ];
 
-    for region in butterfly_pages.iter_mut() {
-        region.start();
-        println!("{:#?}", region);
+    for region in regions.iter_mut() {
+        match region.start() {
+            Ok(region) => println!("{:#?}", region),
+            Err(err) => println!("{:#?}", err),
+        }
     }
 }
