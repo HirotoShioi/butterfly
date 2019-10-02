@@ -1,3 +1,4 @@
+use scrape_test::image_loader;
 use scrape_test::ButterflyRegion;
 
 fn main() {
@@ -30,4 +31,7 @@ fn main() {
             Err(err) => println!("{:#?}", err),
         }
     }
+
+    let res = image_loader::get_image("old_north", "ta_sp/papilio/pa_duru-ri.jpg");
+    println!("{:#?}", res);
 }

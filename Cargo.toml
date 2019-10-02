@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-scraper="0.10.1"
-reqwest="0.9.20"
+scraper = "0.10.1"
+reqwest = "0.9.20"
 kanaria = "0.1.1"

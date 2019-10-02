@@ -3,11 +3,18 @@ extern crate reqwest;
 extern crate scraper;
 
 use kanaria::UCSStr;
+use reqwest::StatusCode;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
 use std::fmt;
+use std::fs::File;
+use std::io;
+
+pub mod image_loader;
 
 const WEBSITE_CHARSET: &str = "Shift-JIS";
+const HOST_URL: &str = "http://biokite.com/worldbutterfly/";
+const DIRECTORY_NAME: &str = "images/";
 
 type Id = usize;
 
@@ -55,13 +62,14 @@ impl Butterfly {
     }
 }
 
-
 #[derive(Debug)]
 pub enum RegionError {
     ImageSourceNotFound,
     TextNotFound,
     InvalidIndexButterflyNotFound,
     FailedToFetchHTML,
+    ImageNotFound,
+    ImageNameUnknown,
 }
 
 impl std::error::Error for RegionError {}
@@ -73,6 +81,8 @@ impl fmt::Display for RegionError {
             RegionError::FailedToFetchHTML => "Failed to fetch html",
             RegionError::InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
             RegionError::TextNotFound => "Text description of a butterfly could not be extracted",
+            RegionError::ImageNotFound => "Image could not be fetched",
+            RegionError::ImageNameUnknown => "Image name unknown",
         };
         write!(f, "{}", error_message)
     }
@@ -244,5 +254,39 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
             Some((jp.to_string(), eng))
         }
         _ => None,
+    }
+}
+
+///Fetch image from biokite.com and store them on a directory
+/// 
+/// Will return `Error` type if,
+/// 
+/// 1. Image could not be fetched (either connnection issue or status code other than `Ok`)
+/// 2. Image name is unknown (very unlikely to happen)
+/// 3. File could not be created
+/// 4. Writing to file failed
+pub fn get_image(subdir: &str, url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let img_url = [HOST_URL, url].concat();
+    let mut response = reqwest::get(&img_url)?;
+
+    if response.status() != StatusCode::OK {
+        return Err(Box::new(RegionError::ImageNotFound));
+    }
+
+    let fname = response
+        .url()
+        .path_segments()
+        .and_then(|segments| segments.last())
+        .and_then(|name| if name.is_empty() { None } else { Some(name) });
+
+    match fname {
+        None => Err(Box::new(RegionError::ImageNameUnknown)),
+        Some(name) => {
+            let file_path = [DIRECTORY_NAME, subdir, "/", name].concat();
+            let file_path = UCSStr::from_str(&file_path).narrow().to_string();
+            let mut out = File::create(&file_path)?;
+            io::copy(&mut response, &mut out)?;
+            Ok(file_path)
+        }
     }
 }
