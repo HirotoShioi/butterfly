@@ -1,5 +1,5 @@
 [package]
-name = "scrape_test"
+name = "butterfly"
 version = "0.1.0"
 authors = ["Hiroto Shioi <hiroto.shioi@iohk.io>"]
 edition = "2018"

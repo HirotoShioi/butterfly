@@ -7,10 +7,8 @@ use reqwest::StatusCode;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::HashMap;
 use std::fmt;
-use std::fs::File;
+use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
-
-pub mod image_loader;
 
 const WEBSITE_CHARSET: &str = "Shift-JIS";
 const HOST_URL: &str = "http://biokite.com/worldbutterfly/";
@@ -22,6 +20,7 @@ type Id = usize;
 pub struct Butterfly {
     /// Url of an image
     img_src: String,
+    img_path: Option<String>,
     /// Japanese name
     jp_name: String,
     /// English name
@@ -39,6 +38,7 @@ impl Butterfly {
         let eng_name = String::new();
         Butterfly {
             img_src: img_src.to_string(),
+            img_path: None,
             jp_name,
             eng_name,
             bgcolor: bgcolor.to_string(),
@@ -92,9 +92,9 @@ impl fmt::Display for RegionError {
 #[derive(Debug)]
 pub struct ButterflyRegion {
     /// Name of the region
-    name: String,
+    pub name: String,
     /// Url of region page
-    url: String,
+    pub url: String,
     /// Collections of butterflies
     butterflies: HashMap<Id, Butterfly>,
 }
@@ -193,6 +193,24 @@ impl ButterflyRegion {
 
         Ok(self)
     }
+
+    ///Fetch images
+    pub fn fetch_images(&mut self) {
+        let dir_path = [DIRECTORY_NAME, "/", &self.name].concat();
+
+        if create_dir_all(&dir_path).is_err() {
+            remove_dir_all(&dir_path).unwrap();
+            create_dir_all(&dir_path).unwrap();
+        };
+
+        for (_key, butterfly) in self.butterflies.iter_mut() {
+            if let Ok(img_path) = get_image(&self.name, &butterfly.img_src) {
+                butterfly.img_path.replace(img_path);
+            } else {
+                println!("Image not found: {}", &butterfly.jp_name);
+            };
+        }
+    }
 }
 
 ///Fetch content of given `url`
@@ -258,9 +276,9 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
 }
 
 ///Fetch image from biokite.com and store them on a directory
-/// 
+///
 /// Will return `Error` type if,
-/// 
+///
 /// 1. Image could not be fetched (either connnection issue or status code other than `Ok`)
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
@@ -283,6 +301,7 @@ pub fn get_image(subdir: &str, url: &str) -> Result<String, Box<dyn std::error::
         None => Err(Box::new(RegionError::ImageNameUnknown)),
         Some(name) => {
             let file_path = [DIRECTORY_NAME, subdir, "/", name].concat();
+            //Convert to half-width since some of the are mixed with full and half width
             let file_path = UCSStr::from_str(&file_path).narrow().to_string();
             let mut out = File::create(&file_path)?;
             io::copy(&mut response, &mut out)?;

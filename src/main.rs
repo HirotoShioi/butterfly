@@ -1,37 +1,34 @@
-use scrape_test::image_loader;
-use scrape_test::ButterflyRegion;
+use butterfly::ButterflyRegion;
 
 fn main() {
     let mut regions = vec![
         ButterflyRegion::new(
-            "旧北区",
+            "old_north",
             "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall",
         ),
         ButterflyRegion::new(
-            "新北区",
+            "new_north",
             "http://biokite.com/worldbutterfly/butterfly-NArc.htm#NAsa",
         ),
         ButterflyRegion::new(
-            "新熱帯区",
+            "new_tropical",
             "http://biokite.com/worldbutterfly/butterfly-NTro.htm#NTmap",
         ),
         ButterflyRegion::new(
-            "インド・オーストラリア区",
+            "india_australia",
             "http://biokite.com/worldbutterfly/butterfly-IOrs.htm#IOmap",
         ),
         ButterflyRegion::new(
-            "熱帯アフリカの蝶",
+            "tropical_africa",
             "http://biokite.com/worldbutterfly/butterfly-TAfr.htm#TAmaps",
         ),
     ];
 
     for region in regions.iter_mut() {
-        match region.start() {
-            Ok(region) => println!("{:#?}", region),
-            Err(err) => println!("{:#?}", err),
-        }
+        let url = region.url.to_owned();
+        region
+            .start()
+            .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url));
+        // region.fetch_images();
     }
-
-    let res = image_loader::get_image("old_north", "ta_sp/papilio/pa_duru-ri.jpg");
-    println!("{:#?}", res);
 }
