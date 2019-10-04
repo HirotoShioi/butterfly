@@ -18,6 +18,7 @@ type Id = usize;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct Butterfly {
+    title: String,
     /// Url of an image
     img_src: String,
     img_path: Option<String>,
@@ -33,10 +34,11 @@ impl Butterfly {
     ///Creates an instance of `Butterfly`
     ///
     /// `jp_name` and `eng_name` is empty due to the structure of the website
-    fn new(img_src: &str, bgcolor: &str) -> Butterfly {
+    fn new(img_src: &str, bgcolor: &str, title: &str) -> Butterfly {
         let jp_name = String::new();
         let eng_name = String::new();
         Butterfly {
+            title: title.to_string(),
             img_src: img_src.to_string(),
             img_path: None,
             jp_name,
@@ -118,9 +120,17 @@ impl ButterflyRegion {
     }
 
     /// Insert new `Butterfly` to `butterflies`
-    fn insert_butterfly(&mut self, img_src: &str, color: &str) -> Option<&mut ButterflyRegion> {
+    fn insert_butterfly(
+        &mut self,
+        img_src: &str,
+        color: &str,
+        title: &str,
+    ) -> Option<&mut ButterflyRegion> {
         let id = self.butterflies.len();
-        match self.butterflies.insert(id, Butterfly::new(img_src, color)) {
+        match self
+            .butterflies
+            .insert(id, Butterfly::new(img_src, color, title))
+        {
             Some(_old_val) => None,
             None => Some(self),
         }
@@ -150,8 +160,13 @@ impl ButterflyRegion {
         let img_selector = Selector::parse("img").unwrap();
 
         let mut name_id = 0;
+        let mut color_title_map: HashMap<String, String> = HashMap::new();
+        let mut table_color = "#ffffff";
 
         for table in fragment.select(&table_selector) {
+            if let Some(color) = table.value().attr("bgcolor") {
+                table_color = color;
+            };
             for tbody in table.select(&tbody_selector) {
                 for tr in tbody.select(&tr_selector) {
                     if !is_title_section(&tr) {
@@ -160,11 +175,24 @@ impl ButterflyRegion {
                             // as well as background color
                             if let Some(img) = td.select(&img_selector).next() {
                                 if let Some(src) = img.value().attr("src") {
-                                    let mut c = "#ffffff";
-                                    if let Some(color) = td.value().attr("bgcolor") {
-                                        c = color
-                                    }
-                                    self.insert_butterfly(src, c);
+                                    let c = if let Some(color) = td.value().attr("bgcolor") {
+                                        color
+                                    } else {
+                                        table_color
+                                    };
+                                    let title = match color_title_map.get(c) {
+                                        Some(t) => t,
+                                        None => {
+                                            if c == "#ffff66" {
+                                                "アゲハチョウ科"
+                                            } else {
+                                                println!("Title not found: {}", src);
+                                                ""
+                                            }
+                                        }
+                                    };
+
+                                    self.insert_butterfly(src, c, &title);
                                 } else {
                                     //throw error
                                     return Err(RegionError::ImageSourceNotFound);
@@ -173,7 +201,7 @@ impl ButterflyRegion {
                             // names from it
                             } else {
                                 // Ignore empty cell
-                                if !is_empty_text(td.clone().text().collect()) {
+                                if !is_empty_text(&(td.clone().text().collect::<String>())) {
                                     if let Some((jp_name, eng_name)) = get_jp_en_name(td) {
                                         if self.add_names(&jp_name, &eng_name, name_id) {
                                             name_id += 1;
@@ -185,6 +213,12 @@ impl ButterflyRegion {
                                     };
                                 }
                             };
+                        }
+                    } else {
+                        //Extract title and its color
+                        let vecs = extract_color_title(table_color, &tr);
+                        for (color, title) in vecs {
+                            color_title_map.insert(color, title);
                         }
                     }
                 }
@@ -224,10 +258,14 @@ fn is_title_section(element: &ElementRef) -> bool {
     let mut is_title = false;
     let td_selector = Selector::parse("td").unwrap();
     if let Some(td) = element.select(&td_selector).next() {
-        for attr in td.value().attrs() {
-            if attr.0 == "colspan" {
-                is_title = true;
-            }
+        let has_colspan = td.value().attr("colspan").is_some();
+        let has_bgcolor = td.value().attr("bgcolor") == Some("#ffff66");
+        let has_width = td.value().attr("width") == Some("337");
+
+        if has_width && has_bgcolor {
+            is_title = false;
+        } else if has_colspan {
+            is_title = true;
         }
     };
 
@@ -235,8 +273,27 @@ fn is_title_section(element: &ElementRef) -> bool {
 }
 
 ///Checks if given `String` is consisted by whitespaces
-fn is_empty_text(str: String) -> bool {
+fn is_empty_text(str: &str) -> bool {
     str.trim_start().is_empty()
+}
+
+///Extract vectors of color and its title
+fn extract_color_title(table_color: &str, element: &ElementRef) -> Vec<(String, String)> {
+    let td_selector = Selector::parse("td").unwrap();
+    let mut pairs = Vec::new();
+
+    for td in element.select(&td_selector) {
+        let title = td.text().find(|txt| txt.contains("科")).unwrap_or("");
+        if !is_empty_text(title) {
+            if let Some(color) = td.value().attr("bgcolor") {
+                pairs.push((color.to_string(), title.to_string()));
+            } else {
+                pairs.push((table_color.to_string(), title.to_string()));
+            }
+        }
+    }
+
+    pairs
 }
 
 ///Extract both Japanese and English name from given `ElementRef`

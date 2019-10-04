@@ -26,9 +26,10 @@ fn main() {
 
     for region in regions.iter_mut() {
         let url = region.url.to_owned();
+        println!("{}", &region.name);
         region
             .start()
             .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url));
-        // region.fetch_images();
+        // println!("{:#?}", region);
     }
 }
