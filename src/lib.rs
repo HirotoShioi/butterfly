@@ -3,9 +3,9 @@ extern crate reqwest;
 extern crate scraper;
 
 use kanaria::UCSStr;
-use reqwest::StatusCode;
+use reqwest::{StatusCode, Url};
 use scraper::{ElementRef, Html, Selector};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
@@ -15,6 +15,7 @@ const WEBSITE_CHARSET: &str = "Shift-JIS";
 const HOST_URL: &str = "http://biokite.com/worldbutterfly/";
 const ASSET_DIRECTORY: &str = "./assets";
 const IMAGE_DIRECTORY: &str = "images";
+const PDF_DIRECTORY: &str = "pdf";
 
 type Id = usize;
 
@@ -24,8 +25,12 @@ pub struct Butterfly {
     category: String,
     /// Url of an image
     img_src: String,
+    /// Url to pdf
+    pdf_src: String,
     /// Path to image
     img_path: Option<String>,
+    /// Path to pdf file
+    pdf_path: String,
     /// Japanese name
     jp_name: String,
     /// English name
@@ -38,15 +43,15 @@ impl Butterfly {
     ///Creates an instance of `Butterfly`
     ///
     /// `jp_name` and `eng_name` is empty due to the structure of the website
-    fn new(img_src: &str, bgcolor: &str, category: &str) -> Butterfly {
-        let jp_name = String::new();
-        let eng_name = String::new();
+    fn new(img_src: &str, pdf_src: &str, bgcolor: &str, category: &str) -> Butterfly {
         Butterfly {
             category: category.to_string(),
             img_src: img_src.to_string(),
+            pdf_src: pdf_src.to_string(),
             img_path: None,
-            jp_name,
-            eng_name,
+            pdf_path: String::new(),
+            jp_name: String::new(),
+            eng_name: String::new(),
             bgcolor: bgcolor.to_string(),
         }
     }
@@ -85,8 +90,12 @@ impl fmt::Display for ButterflyRegionError {
         let error_message = match self {
             ButterflyRegionError::ImageSourceNotFound => "Image source not found",
             ButterflyRegionError::FailedToFetchHTML => "Failed to fetch html",
-            ButterflyRegionError::InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
-            ButterflyRegionError::TextNotFound => "Text description of a butterfly could not be extracted",
+            ButterflyRegionError::InvalidIndexButterflyNotFound => {
+                "Index of given butterfly does not exist"
+            }
+            ButterflyRegionError::TextNotFound => {
+                "Text description of a butterfly could not be extracted"
+            }
             ButterflyRegionError::ImageNotFound => "Image could not be fetched",
             ButterflyRegionError::ImageNameUnknown => "Image name unknown",
         };
@@ -102,7 +111,9 @@ pub struct ButterflyRegion {
     /// Url of region page
     pub url: String,
     /// Collections of butterflies
-    butterflies: HashMap<Id, Butterfly>,
+    pub butterflies: HashMap<Id, Butterfly>,
+    /// Pdf collection
+    pub pdfs: HashSet<String>,
 }
 
 impl ButterflyRegion {
@@ -113,6 +124,7 @@ impl ButterflyRegion {
             name: name.to_string(),
             url: url.to_string(),
             butterflies,
+            pdfs: HashSet::new(),
         }
     }
 
@@ -127,13 +139,14 @@ impl ButterflyRegion {
     fn insert_butterfly(
         &mut self,
         img_src: &str,
+        pdf_src: &str,
         color: &str,
         category: &str,
     ) -> Option<&mut ButterflyRegion> {
         let id = self.butterflies.len();
         match self
             .butterflies
-            .insert(id, Butterfly::new(img_src, color, category))
+            .insert(id, Butterfly::new(img_src, pdf_src, color, category))
         {
             Some(_old_val) => None,
             None => Some(self),
@@ -162,6 +175,7 @@ impl ButterflyRegion {
         let tr_selector = Selector::parse("tr").unwrap();
         let td_selector = Selector::parse("td").unwrap();
         let img_selector = Selector::parse("img").unwrap();
+        let a_selector = Selector::parse("a").unwrap();
 
         let mut name_id = 0;
         let mut color_category_map: HashMap<String, String> = HashMap::new();
@@ -179,13 +193,22 @@ impl ButterflyRegion {
                             // as well as background color
                             if let Some(img) = td.select(&img_selector).next() {
                                 if let Some(src) = img.value().attr("src") {
+                                    //Extract the url to pdf here
                                     let (color, category) = extract_color_category(
                                         src,
                                         table_color,
                                         td,
                                         &color_category_map,
                                     );
-                                    self.insert_butterfly(src, color, &category);
+                                    let href = td
+                                        .select(&a_selector)
+                                        .next()
+                                        .unwrap()
+                                        .value()
+                                        .attr("href")
+                                        .unwrap();
+                                    self.pdfs.insert(href.to_owned());
+                                    self.insert_butterfly(src, href, color, &category);
                                 } else {
                                     //throw error
                                     return Err(ButterflyRegionError::ImageSourceNotFound);
@@ -199,7 +222,9 @@ impl ButterflyRegion {
                                         if self.add_names(&jp_name, &eng_name, name_id) {
                                             name_id += 1;
                                         } else {
-                                            return Err(ButterflyRegionError::InvalidIndexButterflyNotFound);
+                                            return Err(
+                                                ButterflyRegionError::InvalidIndexButterflyNotFound,
+                                            );
                                         };
                                     } else {
                                         return Err(ButterflyRegionError::TextNotFound);
@@ -223,9 +248,13 @@ impl ButterflyRegion {
 
     ///Fetch images
     pub fn fetch_images(&mut self) {
+        if self.butterflies.is_empty() {
+            panic!("Butterfly data has not been extracted!")
+        }
+
         let dir_path = Path::new(ASSET_DIRECTORY)
-            .join(IMAGE_DIRECTORY)
-            .join(&self.name);
+            .join(&self.name)
+            .join(IMAGE_DIRECTORY);
 
         if create_dir_all(&dir_path).is_err() {
             remove_dir_all(&dir_path).unwrap();
@@ -233,12 +262,47 @@ impl ButterflyRegion {
         };
 
         for (_key, butterfly) in self.butterflies.iter_mut() {
-            let url = [HOST_URL, &butterfly.img_src].concat();
-            if let Ok(img_path) = download_file(&dir_path, &url) {
+            let url = Url::parse(HOST_URL)
+                .unwrap()
+                .join(&butterfly.img_src)
+                .unwrap();
+            if let Ok(img_path) = download_file(&dir_path, url) {
                 butterfly.img_path.replace(img_path);
             } else {
                 println!("Image not found: {}", &butterfly.jp_name);
             };
+        }
+    }
+
+    pub fn fetch_pdfs(&mut self) {
+        if self.pdfs.is_empty() {
+            panic!("Butterfly data has not been extracted yet!")
+        }
+
+        let dir_path = Path::new(ASSET_DIRECTORY)
+            .join(&self.name)
+            .join(PDF_DIRECTORY);
+
+        if create_dir_all(&dir_path).is_err() {
+            remove_dir_all(&dir_path).unwrap();
+            create_dir_all(&dir_path).unwrap();
+        };
+
+        for pdf_url in self.pdfs.iter() {
+            let url = Url::parse(HOST_URL).unwrap().join(&pdf_url).unwrap();
+            match download_file(&dir_path, url) {
+                Ok(pdf_path) => {
+                    for butterfly in self.butterflies.values_mut() {
+                        if &butterfly.pdf_src == pdf_url {
+                            butterfly.pdf_path.push_str(&pdf_path);
+                        }
+                    }
+                    println!("{}", pdf_path);
+                }
+                Err(err) => {
+                    println!("{:?}", err);
+                }
+            }
         }
     }
 }
@@ -255,7 +319,7 @@ fn is_category_section(element: &ElementRef) -> bool {
     let td_selector = Selector::parse("td").unwrap();
     if let Some(td) = element.select(&td_selector).next() {
         let has_colspan = td.value().attr("colspan").is_some();
-        // Table cell with these attributes are not category cell, so ignore them
+        // Table cell with these attributes is not category cell, so ignore them
         let has_bgcolor = td.value().attr("bgcolor") == Some("#ffff66");
         let has_width = td.value().attr("width") == Some("337");
 
@@ -364,10 +428,7 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
 /// 4. Writing to file failed
-pub fn download_file(
-    directory: &PathBuf,
-    url: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+pub fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {

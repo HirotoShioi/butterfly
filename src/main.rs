@@ -29,8 +29,7 @@ fn main() {
         println!("{}", &region.name);
         region
             .start()
-            .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url))
-            .fetch_images();
+            .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url));
         println!("{:#?}", region);
     }
 }
