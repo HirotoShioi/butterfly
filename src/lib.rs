@@ -9,18 +9,22 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
+use std::path::{Path, PathBuf};
 
 const WEBSITE_CHARSET: &str = "Shift-JIS";
 const HOST_URL: &str = "http://biokite.com/worldbutterfly/";
-const DIRECTORY_NAME: &str = "images/";
+const ASSET_DIRECTORY: &str = "./assets";
+const IMAGE_DIRECTORY: &str = "images";
 
 type Id = usize;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct Butterfly {
-    title: String,
+    /// Category
+    category: String,
     /// Url of an image
     img_src: String,
+    /// Path to image
     img_path: Option<String>,
     /// Japanese name
     jp_name: String,
@@ -34,11 +38,11 @@ impl Butterfly {
     ///Creates an instance of `Butterfly`
     ///
     /// `jp_name` and `eng_name` is empty due to the structure of the website
-    fn new(img_src: &str, bgcolor: &str, title: &str) -> Butterfly {
+    fn new(img_src: &str, bgcolor: &str, category: &str) -> Butterfly {
         let jp_name = String::new();
         let eng_name = String::new();
         Butterfly {
-            title: title.to_string(),
+            category: category.to_string(),
             img_src: img_src.to_string(),
             img_path: None,
             jp_name,
@@ -65,7 +69,7 @@ impl Butterfly {
 }
 
 #[derive(Debug)]
-pub enum RegionError {
+pub enum ButterflyRegionError {
     ImageSourceNotFound,
     TextNotFound,
     InvalidIndexButterflyNotFound,
@@ -74,17 +78,17 @@ pub enum RegionError {
     ImageNameUnknown,
 }
 
-impl std::error::Error for RegionError {}
+impl std::error::Error for ButterflyRegionError {}
 
-impl fmt::Display for RegionError {
+impl fmt::Display for ButterflyRegionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         let error_message = match self {
-            RegionError::ImageSourceNotFound => "Image source not found",
-            RegionError::FailedToFetchHTML => "Failed to fetch html",
-            RegionError::InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
-            RegionError::TextNotFound => "Text description of a butterfly could not be extracted",
-            RegionError::ImageNotFound => "Image could not be fetched",
-            RegionError::ImageNameUnknown => "Image name unknown",
+            ButterflyRegionError::ImageSourceNotFound => "Image source not found",
+            ButterflyRegionError::FailedToFetchHTML => "Failed to fetch html",
+            ButterflyRegionError::InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
+            ButterflyRegionError::TextNotFound => "Text description of a butterfly could not be extracted",
+            ButterflyRegionError::ImageNotFound => "Image could not be fetched",
+            ButterflyRegionError::ImageNameUnknown => "Image name unknown",
         };
         write!(f, "{}", error_message)
     }
@@ -113,8 +117,8 @@ impl ButterflyRegion {
     }
 
     /// Extract informations of butterflies from `url`
-    pub fn start(&mut self) -> Result<&mut Self, RegionError> {
-        let body = request_html(&self.url).map_err(|_e| RegionError::FailedToFetchHTML)?;
+    pub fn start(&mut self) -> Result<&mut Self, ButterflyRegionError> {
+        let body = request_html(&self.url).map_err(|_e| ButterflyRegionError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
         Ok(self)
     }
@@ -124,12 +128,12 @@ impl ButterflyRegion {
         &mut self,
         img_src: &str,
         color: &str,
-        title: &str,
+        category: &str,
     ) -> Option<&mut ButterflyRegion> {
         let id = self.butterflies.len();
         match self
             .butterflies
-            .insert(id, Butterfly::new(img_src, color, title))
+            .insert(id, Butterfly::new(img_src, color, category))
         {
             Some(_old_val) => None,
             None => Some(self),
@@ -149,7 +153,7 @@ impl ButterflyRegion {
 
     // Return Result
     ///Parse given html and extract information from it
-    fn parse_page(&mut self, html: &str) -> Result<&mut ButterflyRegion, RegionError> {
+    fn parse_page(&mut self, html: &str) -> Result<&mut ButterflyRegion, ButterflyRegionError> {
         let fragment = Html::parse_document(html);
 
         // Selectors we would use for parsing
@@ -160,7 +164,7 @@ impl ButterflyRegion {
         let img_selector = Selector::parse("img").unwrap();
 
         let mut name_id = 0;
-        let mut color_title_map: HashMap<String, String> = HashMap::new();
+        let mut color_category_map: HashMap<String, String> = HashMap::new();
         let mut table_color = "#ffffff";
 
         for table in fragment.select(&table_selector) {
@@ -169,33 +173,22 @@ impl ButterflyRegion {
             };
             for tbody in table.select(&tbody_selector) {
                 for tr in tbody.select(&tr_selector) {
-                    if !is_title_section(&tr) {
+                    if !is_category_section(&tr) {
                         for td in tr.select(&td_selector) {
                             // If a cell has img element, then extract img source
                             // as well as background color
                             if let Some(img) = td.select(&img_selector).next() {
                                 if let Some(src) = img.value().attr("src") {
-                                    let c = if let Some(color) = td.value().attr("bgcolor") {
-                                        color
-                                    } else {
-                                        table_color
-                                    };
-                                    let title = match color_title_map.get(c) {
-                                        Some(t) => t,
-                                        None => {
-                                            if c == "#ffff66" {
-                                                "アゲハチョウ科"
-                                            } else {
-                                                println!("Title not found: {}", src);
-                                                ""
-                                            }
-                                        }
-                                    };
-
-                                    self.insert_butterfly(src, c, &title);
+                                    let (color, category) = extract_color_category(
+                                        src,
+                                        table_color,
+                                        td,
+                                        &color_category_map,
+                                    );
+                                    self.insert_butterfly(src, color, &category);
                                 } else {
                                     //throw error
-                                    return Err(RegionError::ImageSourceNotFound);
+                                    return Err(ButterflyRegionError::ImageSourceNotFound);
                                 }
                             // If a cell does not have a img source, then extract
                             // names from it
@@ -206,19 +199,19 @@ impl ButterflyRegion {
                                         if self.add_names(&jp_name, &eng_name, name_id) {
                                             name_id += 1;
                                         } else {
-                                            return Err(RegionError::InvalidIndexButterflyNotFound);
+                                            return Err(ButterflyRegionError::InvalidIndexButterflyNotFound);
                                         };
                                     } else {
-                                        return Err(RegionError::TextNotFound);
+                                        return Err(ButterflyRegionError::TextNotFound);
                                     };
                                 }
                             };
                         }
                     } else {
-                        //Extract title and its color
-                        let vecs = extract_color_title(table_color, &tr);
-                        for (color, title) in vecs {
-                            color_title_map.insert(color, title);
+                        //Extract category and its color
+                        let vecs = extract_color_category_vec(table_color, &tr);
+                        for (color, category) in vecs {
+                            color_category_map.insert(color, category);
                         }
                     }
                 }
@@ -230,7 +223,9 @@ impl ButterflyRegion {
 
     ///Fetch images
     pub fn fetch_images(&mut self) {
-        let dir_path = [DIRECTORY_NAME, "/", &self.name].concat();
+        let dir_path = Path::new(ASSET_DIRECTORY)
+            .join(IMAGE_DIRECTORY)
+            .join(&self.name);
 
         if create_dir_all(&dir_path).is_err() {
             remove_dir_all(&dir_path).unwrap();
@@ -238,7 +233,8 @@ impl ButterflyRegion {
         };
 
         for (_key, butterfly) in self.butterflies.iter_mut() {
-            if let Ok(img_path) = get_image(&self.name, &butterfly.img_src) {
+            let url = [HOST_URL, &butterfly.img_src].concat();
+            if let Ok(img_path) = download_file(&dir_path, &url) {
                 butterfly.img_path.replace(img_path);
             } else {
                 println!("Image not found: {}", &butterfly.jp_name);
@@ -253,23 +249,24 @@ pub fn request_html(url: &str) -> Result<String, reqwest::Error> {
     req.text_with_charset(WEBSITE_CHARSET)
 }
 
-///Check if given tr set are title cells by checking its colspan attributes
-fn is_title_section(element: &ElementRef) -> bool {
-    let mut is_title = false;
+///Check if given tr set are category cells
+fn is_category_section(element: &ElementRef) -> bool {
+    let mut is_category = false;
     let td_selector = Selector::parse("td").unwrap();
     if let Some(td) = element.select(&td_selector).next() {
         let has_colspan = td.value().attr("colspan").is_some();
+        // Table cell with these attributes are not category cell, so ignore them
         let has_bgcolor = td.value().attr("bgcolor") == Some("#ffff66");
         let has_width = td.value().attr("width") == Some("337");
 
         if has_width && has_bgcolor {
-            is_title = false;
+            is_category = false;
         } else if has_colspan {
-            is_title = true;
+            is_category = true;
         }
     };
 
-    is_title
+    is_category
 }
 
 ///Checks if given `String` is consisted by whitespaces
@@ -277,23 +274,50 @@ fn is_empty_text(str: &str) -> bool {
     str.trim_start().is_empty()
 }
 
-///Extract vectors of color and its title
-fn extract_color_title(table_color: &str, element: &ElementRef) -> Vec<(String, String)> {
+///Extract vectors of color and its category
+fn extract_color_category_vec(table_color: &str, element: &ElementRef) -> Vec<(String, String)> {
     let td_selector = Selector::parse("td").unwrap();
     let mut pairs = Vec::new();
 
     for td in element.select(&td_selector) {
-        let title = td.text().find(|txt| txt.contains("科")).unwrap_or("");
-        if !is_empty_text(title) {
+        let category = td.text().find(|txt| txt.contains("科")).unwrap_or("");
+        if !is_empty_text(category) {
             if let Some(color) = td.value().attr("bgcolor") {
-                pairs.push((color.to_string(), title.to_string()));
+                pairs.push((color.to_string(), category.to_string()));
             } else {
-                pairs.push((table_color.to_string(), title.to_string()));
+                pairs.push((table_color.to_string(), category.to_string()));
             }
         }
     }
 
     pairs
+}
+
+///Extract Color and Category string from given `td` cell.
+fn extract_color_category<'a>(
+    src: &'a str,
+    table_color: &'a str,
+    td: ElementRef<'a>,
+    color_category_map: &'a HashMap<String, String>,
+) -> (&'a str, &'a str) {
+    let color = if let Some(c) = td.value().attr("bgcolor") {
+        c
+    } else {
+        table_color
+    };
+    let category = match color_category_map.get(color) {
+        Some(t) => t,
+        None => {
+            if color == "#ffff66" {
+                "アゲハチョウ科"
+            } else {
+                println!("category not found: {}", src);
+                ""
+            }
+        }
+    };
+
+    (color, category)
 }
 
 ///Extract both Japanese and English name from given `ElementRef`
@@ -332,7 +356,7 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
     }
 }
 
-///Fetch image from biokite.com and store them on a directory
+///Fetch file from biokite.com and store them on a directory
 ///
 /// Will return `Error` type if,
 ///
@@ -340,12 +364,14 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
 /// 4. Writing to file failed
-pub fn get_image(subdir: &str, url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let img_url = [HOST_URL, url].concat();
-    let mut response = reqwest::get(&img_url)?;
+pub fn download_file(
+    directory: &PathBuf,
+    url: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(RegionError::ImageNotFound));
+        return Err(Box::new(ButterflyRegionError::ImageNotFound));
     }
 
     let fname = response
@@ -355,11 +381,14 @@ pub fn get_image(subdir: &str, url: &str) -> Result<String, Box<dyn std::error::
         .and_then(|name| if name.is_empty() { None } else { Some(name) });
 
     match fname {
-        None => Err(Box::new(RegionError::ImageNameUnknown)),
+        None => Err(Box::new(ButterflyRegionError::ImageNameUnknown)),
         Some(name) => {
-            let file_path = [DIRECTORY_NAME, subdir, "/", name].concat();
+            let file_path = directory.join(name);
             //Convert to half-width since some of the are mixed with full and half width
-            let file_path = UCSStr::from_str(&file_path).narrow().to_string();
+            //Since we're running on Linux, unwrap() here is fine.
+            let file_path = UCSStr::from_str(&file_path.to_str().unwrap())
+                .narrow()
+                .to_string();
             let mut out = File::create(&file_path)?;
             io::copy(&mut response, &mut out)?;
             Ok(file_path)
