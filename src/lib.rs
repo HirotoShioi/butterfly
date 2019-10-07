@@ -1,7 +1,10 @@
+extern crate color_thief;
+extern crate hex;
 extern crate kanaria;
 extern crate reqwest;
 extern crate scraper;
 
+use color_thief::ColorFormat;
 use kanaria::UCSStr;
 use reqwest::{StatusCode, Url};
 use scraper::{ElementRef, Html, Selector};
@@ -11,10 +14,15 @@ use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
+// Encoding used on the butterfly website
 const WEBSITE_CHARSET: &str = "Shift-JIS";
-const HOST_URL: &str = "http://biokite.com/worldbutterfly/";
+// Url of the website
+const BUTTERFLY_URL: &str = "http://biokite.com/worldbutterfly/";
+// Directory which stores the downloaded files
 const ASSET_DIRECTORY: &str = "./assets";
+// Directory which stores the images
 const IMAGE_DIRECTORY: &str = "images";
+// Directory which store the pdf files
 const PDF_DIRECTORY: &str = "pdf";
 
 type Id = usize;
@@ -37,6 +45,7 @@ pub struct Butterfly {
     eng_name: String,
     /// Background color in 6 digit Hex
     bgcolor: String,
+    dominant_colors: Vec<String>,
 }
 
 impl Butterfly {
@@ -45,14 +54,15 @@ impl Butterfly {
     /// `jp_name` and `eng_name` is empty due to the structure of the website
     fn new(img_src: &str, pdf_src: &str, bgcolor: &str, category: &str) -> Butterfly {
         Butterfly {
-            category: category.to_string(),
-            img_src: img_src.to_string(),
-            pdf_src: pdf_src.to_string(),
+            category: String::from(category),
+            img_src: String::from(img_src),
+            pdf_src: String::from(pdf_src),
             img_path: None,
             pdf_path: String::new(),
             jp_name: String::new(),
             eng_name: String::new(),
-            bgcolor: bgcolor.to_string(),
+            bgcolor: String::from(bgcolor),
+            dominant_colors: Vec::new(),
         }
     }
 
@@ -81,6 +91,7 @@ pub enum ButterflyRegionError {
     FailedToFetchHTML,
     ImageNotFound,
     ImageNameUnknown,
+    NotImage,
 }
 
 impl std::error::Error for ButterflyRegionError {}
@@ -98,6 +109,7 @@ impl fmt::Display for ButterflyRegionError {
             }
             ButterflyRegionError::ImageNotFound => "Image could not be fetched",
             ButterflyRegionError::ImageNameUnknown => "Image name unknown",
+            ButterflyRegionError::NotImage => "Downloaded file is not image file",
         };
         write!(f, "{}", error_message)
     }
@@ -197,7 +209,7 @@ impl ButterflyRegion {
                                     let (color, category) = extract_color_category(
                                         src,
                                         table_color,
-                                        td,
+                                        &td,
                                         &color_category_map,
                                     );
                                     let href = td
@@ -208,7 +220,7 @@ impl ButterflyRegion {
                                         .attr("href")
                                         .unwrap();
                                     self.pdfs.insert(href.to_owned());
-                                    self.insert_butterfly(src, href, color, &category);
+                                    self.insert_butterfly(src, href, &color, &category);
                                 } else {
                                     //throw error
                                     return Err(ButterflyRegionError::ImageSourceNotFound);
@@ -262,7 +274,7 @@ impl ButterflyRegion {
         };
 
         for (_key, butterfly) in self.butterflies.iter_mut() {
-            let url = Url::parse(HOST_URL)
+            let url = Url::parse(BUTTERFLY_URL)
                 .unwrap()
                 .join(&butterfly.img_src)
                 .unwrap();
@@ -271,6 +283,21 @@ impl ButterflyRegion {
             } else {
                 println!("Image not found: {}", &butterfly.jp_name);
             };
+        }
+    }
+
+    pub fn fetch_dominant_colors(&mut self) {
+        if self.pdfs.is_empty() {
+            panic!("Butterfly data has not been extracted yet!")
+        }
+
+        for butterfly in self.butterflies.values_mut() {
+            let img_url = Url::parse(BUTTERFLY_URL)
+                .unwrap()
+                .join(&butterfly.img_src)
+                .unwrap();
+            let mut colors = get_dominant_colors(img_url).unwrap();
+            butterfly.dominant_colors.append(&mut colors);
         }
     }
 
@@ -289,7 +316,7 @@ impl ButterflyRegion {
         };
 
         for pdf_url in self.pdfs.iter() {
-            let url = Url::parse(HOST_URL).unwrap().join(&pdf_url).unwrap();
+            let url = Url::parse(BUTTERFLY_URL).unwrap().join(&pdf_url).unwrap();
             match download_file(&dir_path, url) {
                 Ok(pdf_path) => {
                     for butterfly in self.butterflies.values_mut() {
@@ -358,12 +385,12 @@ fn extract_color_category_vec(table_color: &str, element: &ElementRef) -> Vec<(S
 }
 
 ///Extract Color and Category string from given `td` cell.
-fn extract_color_category<'a>(
-    src: &'a str,
-    table_color: &'a str,
-    td: ElementRef<'a>,
-    color_category_map: &'a HashMap<String, String>,
-) -> (&'a str, &'a str) {
+fn extract_color_category(
+    src: &str,
+    table_color: &str,
+    td: &ElementRef,
+    color_category_map: &HashMap<String, String>,
+) -> (String, String) {
     let color = if let Some(c) = td.value().attr("bgcolor") {
         c
     } else {
@@ -381,7 +408,8 @@ fn extract_color_category<'a>(
         }
     };
 
-    (color, category)
+    let c = String::from(color).chars().filter(|c| *c != '#').collect();
+    (c, category.to_string())
 }
 
 ///Extract both Japanese and English name from given `ElementRef`
@@ -428,7 +456,7 @@ fn get_jp_en_name(td: ElementRef) -> Option<(String, String)> {
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
 /// 4. Writing to file failed
-pub fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
+fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
@@ -455,4 +483,26 @@ pub fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn st
             Ok(file_path)
         }
     }
+}
+
+const IMAGE_QUALITY: u8 = 10;
+const COLOR_NUM: u8 = 2;
+
+///Fetch an image, and returns vector of dominant colors
+fn get_dominant_colors(url: Url) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut res = reqwest::get(url)?;
+    let mut buf: Vec<u8> = vec![];
+    res.copy_to(&mut buf)?;
+
+    let colors = color_thief::get_palette(&buf, ColorFormat::Rgb, IMAGE_QUALITY, COLOR_NUM)
+        .map_err(|_| ButterflyRegionError::NotImage)?;
+
+    let mut hex_colors: Vec<String> = vec![];
+
+    for color in colors {
+        let hex_color = hex::encode(vec![color.r, color.g, color.b]);
+        hex_colors.push(hex_color);
+    }
+
+    Ok(hex_colors)
 }
