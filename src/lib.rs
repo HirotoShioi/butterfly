@@ -3,6 +3,8 @@ extern crate hex;
 extern crate kanaria;
 extern crate reqwest;
 extern crate scraper;
+extern crate serde;
+extern crate serde_json;
 
 use color_thief::ColorFormat;
 use kanaria::UCSStr;
@@ -13,6 +15,8 @@ use std::fmt;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
+
+pub mod cloud_vision;
 
 // Encoding used on the butterfly website
 const WEBSITE_CHARSET: &str = "Shift-JIS";
@@ -408,8 +412,7 @@ fn extract_color_category(
         }
     };
 
-    let c = String::from(color).chars().filter(|c| *c != '#').collect();
-    (c, category.to_string())
+    (color.to_string(), category.to_string())
 }
 
 ///Extract both Japanese and English name from given `ElementRef`
@@ -485,7 +488,8 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
     }
 }
 
-const IMAGE_QUALITY: u8 = 10;
+/// Stop using this api!
+const IMAGE_QUALITY: u8 = 5;
 const COLOR_NUM: u8 = 2;
 
 ///Fetch an image, and returns vector of dominant colors
@@ -494,14 +498,16 @@ fn get_dominant_colors(url: Url) -> Result<Vec<String>, Box<dyn std::error::Erro
     let mut buf: Vec<u8> = vec![];
     res.copy_to(&mut buf)?;
 
-    let colors = color_thief::get_palette(&buf, ColorFormat::Rgb, IMAGE_QUALITY, COLOR_NUM)
+    let colors = color_thief::get_palette(&buf, ColorFormat::Bgr, IMAGE_QUALITY, COLOR_NUM)
         .map_err(|_| ButterflyRegionError::NotImage)?;
 
     let mut hex_colors: Vec<String> = vec![];
 
     for color in colors {
-        let hex_color = hex::encode(vec![color.r, color.g, color.b]);
-        hex_colors.push(hex_color);
+        let mut hexcolor = String::from("#");
+        let hex = hex::encode(vec![color.r, color.g, color.b]);
+        hexcolor.push_str(&hex);
+        hex_colors.push(hexcolor);
     }
 
     Ok(hex_colors)

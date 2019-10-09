@@ -12,3 +12,5 @@ reqwest = "0.9.20"
 kanaria = "0.1.1"
 color-thief = "0.1"
 hex = "0.4.0"
+serde_json = "1.0"
+serde = { version = "1.0.99", features = ["derive"]}

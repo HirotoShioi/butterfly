@@ -1,4 +1,6 @@
+use butterfly::cloud_vision;
 use butterfly::ButterflyRegion;
+use reqwest;
 
 fn main() {
     let mut regions = vec![
@@ -24,13 +26,20 @@ fn main() {
         // ),
     ];
 
-    for region in regions.iter_mut() {
-        let url = region.url.to_owned();
-        println!("{}", &region.name);
-        region
-            .start()
-            .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url))
-            .fetch_dominant_colors();
-        println!("{:#?}", region);
-    }
+    // for region in regions.iter_mut() {
+    //     let url = region.url.to_owned();
+    //     println!("{}", &region.name);
+    //     region
+    //         .start()
+    //         .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url))
+    //         .fetch_dominant_colors();
+    //     println!("{:#?}", region);
+    // }
+
+    let url =
+        reqwest::Url::parse("http://biokite.com/worldbutterfly/pa-sp/papilio/sukasitaisu.jpg")
+            .unwrap();
+    let cols = cloud_vision::get_dominant_colors(&url).unwrap();
+
+    println!("{:#?}", cols);
 }
