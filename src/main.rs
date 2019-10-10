@@ -1,10 +1,10 @@
 use butterfly::cloud_vision;
-use butterfly::ButterflyRegion;
+use butterfly::Client;
 use reqwest;
 
 fn main() {
     let mut regions = vec![
-        ButterflyRegion::new(
+        Client::new(
             "old_north",
             "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall",
         ),
@@ -26,19 +26,20 @@ fn main() {
         // ),
     ];
 
-    // for region in regions.iter_mut() {
-    //     let url = region.url.to_owned();
-    //     println!("{}", &region.name);
-    //     region
-    //         .start()
-    //         .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url))
-    //         .fetch_dominant_colors();
-    //     println!("{:#?}", region);
-    // }
+    for region in regions.iter_mut() {
+        let url = region.url.to_owned();
+        println!("{}", &region.name);
+        region
+            .start()
+            .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url))
+            .fetch_images();
+        println!("{:#?}", region);
+    }
 
-    let url =
-        reqwest::Url::parse("http://biokite.com/worldbutterfly/pa-sp/papilio/sukasitaisu.jpg")
-            .unwrap();
+    let url = reqwest::Url::parse(
+        "http://www.ibukiyama-driveway.jp/images/flower/flower_20191006175111_02.jpg",
+    )
+    .unwrap();
     let cols = cloud_vision::get_dominant_colors(&url).unwrap();
 
     println!("{:#?}", cols);

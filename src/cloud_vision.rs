@@ -4,10 +4,16 @@ use serde_json::{json, Value};
 use std::fmt;
 use std::fs;
 
-const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
-const API_KEY_FILE_PATH: &str = "./secrets/vision_api";
-
 pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::error::Error>> {
+    let response_json = use_cloud_vision_api(image_url)?;
+    let extracted = extract_colors(&response_json)?;
+    Ok(extracted)
+}
+
+const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
+const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
+
+fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
     let request = json!({
         "requests": [
           {
@@ -46,9 +52,7 @@ pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::e
         return Err(Box::new(CloudVisionError::FailedToParseImage));
     }
 
-    let extracted = extract_colors(&response_json)?;
-
-    Ok(extracted)
+    Ok(response_json)
 }
 
 fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
@@ -105,9 +109,9 @@ fn to_color(value: &Value) -> Option<Color> {
     let score = value.get("score")?.as_f64()? as f32;
 
     let color = &value.get("color")?;
-    let red:u8 = color.get("red")?.to_owned().as_u64()? as u8;
-    let green:u8 = color.get("green")?.to_owned().as_u64()? as u8;
-    let blue:u8 = color.get("blue")?.to_owned().as_u64()? as u8;
+    let red: u8 = color.get("red")?.to_owned().as_u64()? as u8;
+    let green: u8 = color.get("green")?.to_owned().as_u64()? as u8;
+    let blue: u8 = color.get("blue")?.to_owned().as_u64()? as u8;
 
     //Construct hex string color
     let mut hex_color = String::from("#");
@@ -119,7 +123,7 @@ fn to_color(value: &Value) -> Option<Color> {
     let color_struct = Color {
         pixel_fraction,
         score,
-        hex_color
+        hex_color,
     };
 
     Some(color_struct)
