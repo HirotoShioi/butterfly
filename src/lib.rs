@@ -1,4 +1,3 @@
-extern crate color_thief;
 extern crate hex;
 extern crate kanaria;
 extern crate reqwest;

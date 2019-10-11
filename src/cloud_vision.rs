@@ -4,14 +4,14 @@ use serde_json::{json, Value};
 use std::fmt;
 use std::fs;
 
+const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
+const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
+
 pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::error::Error>> {
     let response_json = use_cloud_vision_api(image_url)?;
     let extracted = extract_colors(&response_json)?;
     Ok(extracted)
 }
-
-const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
-const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
 
 fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
     let request = json!({
@@ -76,7 +76,7 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Color {
     pub pixel_fraction: f32,
     pub score: f32,

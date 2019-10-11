@@ -12,8 +12,9 @@ type Id = usize;
 /// Collections of butterflies categorized by its regions
 #[derive(Debug)]
 pub struct Client {
+    pub dir_name: String,
     /// Name of the region
-    pub name: String,
+    pub region: String,
     /// Url of region page
     pub url: String,
     /// Collections of butterflies
@@ -24,10 +25,11 @@ pub struct Client {
 
 impl Client {
     /// Create an instance of `ButterflyRegion`
-    pub fn new(name: &str, url: &str) -> Client {
+    pub fn new(dir_name: &str, region: &str, url: &str) -> Client {
         let butterflies = HashMap::new();
         Client {
-            name: name.to_string(),
+            dir_name: dir_name.to_string(),
+            region: region.to_string(),
             url: url.to_string(),
             butterflies,
             pdfs: HashSet::new(),
@@ -40,7 +42,8 @@ impl Client {
         self.parse_page(&body)?;
 
         let buttefly_region = ButterflyRegion {
-            name: self.name.to_owned(),
+            dir_name: self.dir_name.to_owned(),
+            region: self.region.to_owned(),
             url: self.url.to_owned(),
             butterflies: self.butterflies.clone(),
             pdfs: self.pdfs.to_owned(),
@@ -57,10 +60,10 @@ impl Client {
         category: &str,
     ) -> Option<&mut Client> {
         let id = self.butterflies.len();
-        match self
-            .butterflies
-            .insert(id, Butterfly::new(img_src, pdf_src, color, category))
-        {
+        match self.butterflies.insert(
+            id,
+            Butterfly::new(&self.region, img_src, pdf_src, color, category),
+        ) {
             Some(_old_val) => None,
             None => Some(self),
         }
@@ -161,7 +164,7 @@ impl Client {
 }
 
 ///Fetch content of given `url`
-pub fn request_html(url: &str) -> Result<String, reqwest::Error> {
+fn request_html(url: &str) -> Result<String, reqwest::Error> {
     let mut req = reqwest::get(url)?;
     req.text_with_charset(WEBSITE_CHARSET)
 }

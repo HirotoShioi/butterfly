@@ -1,4 +1,3 @@
-use color_thief::ColorFormat;
 use kanaria::UCSStr;
 use reqwest::{StatusCode, Url};
 use std::collections::{HashMap, HashSet};
@@ -6,6 +5,7 @@ use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::cloud_vision::{get_dominant_colors, Color};
 use super::errors::ButterflyRegionError;
 
 type Id = usize;
@@ -21,6 +21,8 @@ const PDF_DIRECTORY: &str = "pdf";
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Butterfly {
+    /// Region
+    region: String,
     /// Category
     category: String,
     /// Url of an image
@@ -37,15 +39,23 @@ pub struct Butterfly {
     eng_name: String,
     /// Background color in 6 digit Hex
     bgcolor: String,
-    dominant_colors: Vec<String>,
+    /// List of dominant colors
+    dominant_colors: Vec<Color>,
 }
 
 impl Butterfly {
     ///Creates an instance of `Butterfly`
     ///
     /// `jp_name` and `eng_name` is empty due to the structure of the website
-    pub fn new(img_src: &str, pdf_src: &str, bgcolor: &str, category: &str) -> Butterfly {
+    pub fn new(
+        region: &str,
+        img_src: &str,
+        pdf_src: &str,
+        bgcolor: &str,
+        category: &str,
+    ) -> Butterfly {
         Butterfly {
+            region: String::from(region),
             category: String::from(category),
             img_src: String::from(img_src),
             pdf_src: String::from(pdf_src),
@@ -76,8 +86,9 @@ impl Butterfly {
 }
 
 pub struct ButterflyRegion {
+    pub dir_name: String,
     /// Name of the region
-    pub name: String,
+    pub region: String,
     /// Url of region page
     pub url: String,
     /// Collections of butterflies
@@ -94,7 +105,7 @@ impl ButterflyRegion {
         }
 
         let dir_path = Path::new(ASSET_DIRECTORY)
-            .join(&self.name)
+            .join(&self.dir_name)
             .join(IMAGE_DIRECTORY);
 
         if create_dir_all(&dir_path).is_err() {
@@ -125,7 +136,7 @@ impl ButterflyRegion {
                 .unwrap()
                 .join(&butterfly.img_src)
                 .unwrap();
-            let mut colors = get_dominant_colors(img_url).unwrap();
+            let mut colors = get_dominant_colors(&img_url).unwrap();
             butterfly.dominant_colors.append(&mut colors);
         }
     }
@@ -136,7 +147,7 @@ impl ButterflyRegion {
         }
 
         let dir_path = Path::new(ASSET_DIRECTORY)
-            .join(&self.name)
+            .join(&self.dir_name)
             .join(PDF_DIRECTORY);
 
         if create_dir_all(&dir_path).is_err() {
@@ -198,29 +209,4 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
             Ok(file_path)
         }
     }
-}
-
-/// Stop using this api!
-const IMAGE_QUALITY: u8 = 5;
-const COLOR_NUM: u8 = 2;
-
-///Fetch an image, and returns vector of dominant colors
-fn get_dominant_colors(url: Url) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut res = reqwest::get(url)?;
-    let mut buf: Vec<u8> = vec![];
-    res.copy_to(&mut buf)?;
-
-    let colors = color_thief::get_palette(&buf, ColorFormat::Bgr, IMAGE_QUALITY, COLOR_NUM)
-        .map_err(|_| ButterflyRegionError::NotImage)?;
-
-    let mut hex_colors: Vec<String> = vec![];
-
-    for color in colors {
-        let mut hexcolor = String::from("#");
-        let hex = hex::encode(vec![color.r, color.g, color.b]);
-        hexcolor.push_str(&hex);
-        hex_colors.push(hexcolor);
-    }
-
-    Ok(hex_colors)
 }
