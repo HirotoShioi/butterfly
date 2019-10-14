@@ -1,6 +1,4 @@
-use butterfly::cloud_vision;
 use butterfly::Client;
-use reqwest;
 
 fn main() {
     let mut regions = vec![
@@ -40,11 +38,4 @@ fn main() {
         println!("{:#?}", region);
     }
 
-    // let url = reqwest::Url::parse(
-    //     "http://www.ibukiyama-driveway.jp/images/flower/flower_20191006175111_02.jpg",
-    // )
-    // .unwrap();
-    // let cols = cloud_vision::get_dominant_colors(&url).unwrap();
-
-    // println!("{:#?}", cols);
 }
