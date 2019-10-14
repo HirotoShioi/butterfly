@@ -1,3 +1,5 @@
+extern crate scoped_threadpool;
+
 use kanaria::UCSStr;
 use reqwest::{StatusCode, Url};
 use std::collections::{HashMap, HashSet};
@@ -10,14 +12,16 @@ use super::errors::ButterflyRegionError;
 
 type Id = usize;
 
-// Url of the website
+/// Url of the website
 const BUTTERFLY_URL: &str = "http://biokite.com/worldbutterfly/";
-// Directory which stores the downloaded files
+/// Directory which stores the downloaded files
 const ASSET_DIRECTORY: &str = "./assets";
-// Directory which stores the images
+/// Directory which stores the images
 const IMAGE_DIRECTORY: &str = "images";
-// Directory which store the pdf files
+/// Directory which store the pdf files
 const PDF_DIRECTORY: &str = "pdf";
+/// Number of pools used for thread pool
+const THEAD_POOL_NUM: u32 = 5;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Butterfly {
@@ -114,8 +118,9 @@ impl ButterflyRegion {
             pdfs: pdfs.to_owned(),
         }
     }
-    ///Fetch images
-    pub fn fetch_images(&mut self) {
+
+    ///Fetch images of butterflies
+    pub fn fetch_images(&mut self) -> &mut Self {
         if self.butterflies.is_empty() {
             panic!("Butterfly data has not been extracted!")
         }
@@ -129,7 +134,7 @@ impl ButterflyRegion {
             create_dir_all(&dir_path).unwrap();
         };
 
-        for (_key, butterfly) in self.butterflies.iter_mut() {
+        for butterfly in self.butterflies.values_mut() {
             let url = Url::parse(BUTTERFLY_URL)
                 .unwrap()
                 .join(&butterfly.img_src)
@@ -140,29 +145,44 @@ impl ButterflyRegion {
                 println!("Image not found: {}", &butterfly.jp_name);
             };
         }
+
+        self
     }
 
-    pub fn fetch_dominant_colors(&mut self) {
+    /// Use Google Cloud Vision API to fetch done
+    pub fn fetch_dominant_colors(&mut self) -> &mut Self {
         if self.pdfs.is_empty() {
             panic!("Butterfly data has not been extracted yet!")
         }
 
-        for butterfly in self.butterflies.values_mut() {
-            let img_url = Url::parse(BUTTERFLY_URL)
-                .unwrap()
-                .join(&butterfly.img_src)
-                .unwrap();
-            if let Ok(mut colors) = get_dominant_colors(&img_url) {
-                println!("Success {}", butterfly.jp_name);
-                butterfly.dominant_colors.append(&mut colors);
-            } else {
-                println!("Failed {}", butterfly.jp_name);
-                println!("Failed: {:#?}", img_url);
-            };
-        }
+        // Use threadpool
+        use scoped_threadpool::Pool;
+
+        let mut pool = Pool::new(THEAD_POOL_NUM);
+
+        pool.scoped(|scoped| {
+            for butterfly in self.butterflies.values_mut() {
+                let img_url = Url::parse(BUTTERFLY_URL)
+                    .unwrap()
+                    .join(&butterfly.img_src)
+                    .unwrap();
+                scoped.execute(move || {
+                    if let Ok(mut colors) = get_dominant_colors(&img_url) {
+                        println!("Success {}", butterfly.jp_name);
+                        butterfly.dominant_colors.append(&mut colors);
+                    } else {
+                        println!("Failed {}", butterfly.jp_name);
+                        println!("Failed: {:#?}", img_url);
+                    };
+                });
+            }
+        });
+
+        self
     }
 
-    pub fn fetch_pdfs(&mut self) {
+    /// Download PDF files
+    pub fn fetch_pdfs(&mut self) -> &mut Self {
         if self.pdfs.is_empty() {
             panic!("Butterfly data has not been extracted yet!")
         }
@@ -192,6 +212,8 @@ impl ButterflyRegion {
                 }
             }
         }
+
+        self
     }
 }
 

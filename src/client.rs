@@ -10,8 +10,9 @@ const WEBSITE_CHARSET: &str = "Shift-JIS";
 type Id = usize;
 
 /// Collections of butterflies categorized by its regions
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
+    /// Directory name to store assets
     pub dir_name: String,
     /// Name of the region
     pub region: String,
@@ -37,7 +38,7 @@ impl Client {
     }
 
     /// Extract informations of butterflies from `url`
-    pub fn start(&mut self) -> Result<ButterflyRegion, ButterflyRegionError> {
+    pub fn fetch_data(&mut self) -> Result<ButterflyRegion, ButterflyRegionError> {
         let body = request_html(&self.url).map_err(|_e| ButterflyRegionError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
 

@@ -9,6 +9,7 @@ use std::fs;
 const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
 const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
 
+/// Get list of `Color` using Google Cloud Vision API
 pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::error::Error>> {
     let response_json = use_cloud_vision_api(image_url)?;
     let extracted_color_vec = extract_colors(&response_json)?;
@@ -20,6 +21,7 @@ pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::e
     Ok(extracted_color_vec)
 }
 
+/// Use cloud vision api
 fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
     let base64_image = get_base64_image(image_url)?;
 
@@ -66,6 +68,7 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Er
     Ok(response_json)
 }
 
+/// Extract `Vec<Color>` with given `Value`
 fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
     let colors = &val["responses"][0]["imagePropertiesAnnotation"]["dominantColors"]["colors"];
 
@@ -92,7 +95,7 @@ pub struct Color {
     pub hex_color: String,
 }
 
-//Construct `Color` struct with given `Value`
+/// Construct `Color` struct with given `Value`
 fn to_color(value: &Value) -> Option<Color> {
     let pixel_fraction = value.get("pixelFraction")?.as_f64()? as f32;
     let score = value.get("score")?.as_f64()? as f32;

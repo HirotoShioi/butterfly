@@ -33,11 +33,10 @@ fn main() {
         let url = client.url.to_owned();
         println!("{}", &client.region);
         let mut region = client
-            .start()
+            .fetch_data()
             .unwrap_or_else(|_| panic!("Failed to extract data from: {}", url));
 
-        region.fetch_images();
-        region.fetch_dominant_colors();
+        region.fetch_images().fetch_dominant_colors();
         println!("{:#?}", region);
     }
 }
