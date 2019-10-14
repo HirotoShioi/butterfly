@@ -11,8 +11,13 @@ const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
 
 pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::error::Error>> {
     let response_json = use_cloud_vision_api(image_url)?;
-    let extracted = extract_colors(&response_json)?;
-    Ok(extracted)
+    let extracted_color_vec = extract_colors(&response_json)?;
+
+    if extracted_color_vec.is_empty() {
+        return Err(Box::new(VectorIsEmpty));
+    }
+
+    Ok(extracted_color_vec)
 }
 
 fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
@@ -43,7 +48,7 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Er
         .send()?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(CloudVisionError::BadRequest));
+        return Err(Box::new(BadRequest(image_url.to_owned())));
     }
 
     let response_json: Value = response.json()?;
@@ -51,7 +56,11 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Er
     let err = &response_json["responses"][0]["error"];
 
     if err.is_object() {
-        return Err(Box::new(CloudVisionError::FailedToParseImage));
+        if let Some(error_message) = &err["message"].as_str() {
+            return Err(Box::new(FailedToParseImage(error_message.to_string())));
+        } else {
+            return Err(Box::new(UnknownError));
+        };
     }
 
     Ok(response_json)
@@ -72,7 +81,7 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
             Ok(color_vec)
         }
 
-        None => Err(CloudVisionError::UnableToParseColorData),
+        None => Err(UnableToParseColorData(val.to_owned())),
     }
 }
 
@@ -81,26 +90,6 @@ pub struct Color {
     pub pixel_fraction: f32,
     pub score: f32,
     pub hex_color: String,
-}
-
-#[derive(Debug)]
-enum CloudVisionError {
-    BadRequest,
-    UnableToParseColorData,
-    FailedToParseImage,
-}
-
-impl std::error::Error for CloudVisionError {}
-
-impl fmt::Display for CloudVisionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        let error_message = match self {
-            CloudVisionError::BadRequest => "Bad request",
-            CloudVisionError::FailedToParseImage => "Cloud vision api failed to parse image",
-            CloudVisionError::UnableToParseColorData => "Unable to parse data",
-        };
-        write!(f, "{}", error_message)
-    }
 }
 
 //Construct `Color` struct with given `Value`
@@ -131,10 +120,37 @@ fn to_color(value: &Value) -> Option<Color> {
     Some(color_struct)
 }
 
+/// Get image content and encod it with base64
 fn get_base64_image(image_url: &Url) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = reqwest::get(image_url.to_owned())?;
     let mut buf: Vec<u8> = vec![];
     response.copy_to(&mut buf)?;
     let encoded = base64::encode(&buf);
     Ok(encoded)
+}
+
+use super::cloud_vision::CloudVisionError::*;
+
+#[derive(Debug)]
+enum CloudVisionError {
+    BadRequest(Url),
+    FailedToParseImage(String),
+    UnableToParseColorData(Value),
+    UnknownError,
+    VectorIsEmpty,
+}
+
+impl std::error::Error for CloudVisionError {}
+
+impl fmt::Display for CloudVisionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        let error_message: String = match self {
+            BadRequest(url) => format!("Bad request: {}", url),
+            FailedToParseImage(msg) => format!("Cloud vision api failed to parse image: {}", msg),
+            UnableToParseColorData(val) => format!("Unable to parse data: {:#?}", val),
+            UnknownError => String::from("Unknown error"),
+            VectorIsEmpty => String::from("Extracted data is empty"),
+        };
+        write!(f, "{}", error_message)
+    }
 }
