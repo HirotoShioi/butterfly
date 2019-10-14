@@ -63,6 +63,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "butterfly"
 version = "0.1.0"
 dependencies = [
+ "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "kanaria 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.20 (registry+https://github.com/rust-lang/crates.io-index)",

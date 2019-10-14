@@ -41,13 +41,13 @@ impl Client {
         let body = request_html(&self.url).map_err(|_e| ButterflyRegionError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
 
-        let buttefly_region = ButterflyRegion {
-            dir_name: self.dir_name.to_owned(),
-            region: self.region.to_owned(),
-            url: self.url.to_owned(),
-            butterflies: self.butterflies.clone(),
-            pdfs: self.pdfs.to_owned(),
-        };
+        let buttefly_region = ButterflyRegion::new(
+            &self.dir_name,
+            &self.region,
+            &self.url,
+            &self.butterflies,
+            &self.pdfs,
+        );
         Ok(buttefly_region)
     }
 

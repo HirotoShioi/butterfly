@@ -85,6 +85,7 @@ impl Butterfly {
     }
 }
 
+#[derive(Debug)]
 pub struct ButterflyRegion {
     pub dir_name: String,
     /// Name of the region
@@ -98,6 +99,21 @@ pub struct ButterflyRegion {
 }
 
 impl ButterflyRegion {
+    pub fn new(
+        dir_name: &str,
+        region: &str,
+        url: &str,
+        butterflies: &HashMap<Id, Butterfly>,
+        pdfs: &HashSet<String>,
+    ) -> ButterflyRegion {
+        ButterflyRegion {
+            dir_name: dir_name.to_owned(),
+            region: region.to_owned(),
+            url: url.to_owned(),
+            butterflies: butterflies.to_owned(),
+            pdfs: pdfs.to_owned(),
+        }
+    }
     ///Fetch images
     pub fn fetch_images(&mut self) {
         if self.butterflies.is_empty() {
@@ -136,8 +152,13 @@ impl ButterflyRegion {
                 .unwrap()
                 .join(&butterfly.img_src)
                 .unwrap();
-            let mut colors = get_dominant_colors(&img_url).unwrap();
-            butterfly.dominant_colors.append(&mut colors);
+            if let Ok(mut colors) = get_dominant_colors(&img_url) {
+                println!("Success {}", butterfly.jp_name);
+                butterfly.dominant_colors.append(&mut colors);
+            } else {
+                println!("Failed {}", butterfly.jp_name);
+                println!("Failed: {:#?}", img_url);
+            };
         }
     }
 

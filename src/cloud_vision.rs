@@ -1,3 +1,5 @@
+extern crate base64;
+
 use hex;
 use reqwest::{StatusCode, Url};
 use serde_json::{json, Value};
@@ -14,13 +16,13 @@ pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::e
 }
 
 fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
+    let base64_image = get_base64_image(image_url)?;
+
     let request = json!({
         "requests": [
           {
             "image": {
-                "source": {
-                    "imageUri": image_url.to_owned().into_string()
-                }
+                "content": base64_image
             },
             "features": [
               {
@@ -65,8 +67,6 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
             for color_value in color_ary.iter() {
                 if let Some(color) = to_color(color_value) {
                     color_vec.push(color);
-                } else {
-                    return Err(CloudVisionError::UnableToParseColorData);
                 };
             }
             Ok(color_vec)
@@ -109,6 +109,8 @@ fn to_color(value: &Value) -> Option<Color> {
     let score = value.get("score")?.as_f64()? as f32;
 
     let color = &value.get("color")?;
+
+    // For unknown reason, some responsones does not have all the fields. WIP
     let red: u8 = color.get("red")?.to_owned().as_u64()? as u8;
     let green: u8 = color.get("green")?.to_owned().as_u64()? as u8;
     let blue: u8 = color.get("blue")?.to_owned().as_u64()? as u8;
@@ -127,4 +129,12 @@ fn to_color(value: &Value) -> Option<Color> {
     };
 
     Some(color_struct)
+}
+
+fn get_base64_image(image_url: &Url) -> Result<String, Box<dyn std::error::Error>> {
+    let mut response = reqwest::get(image_url.to_owned())?;
+    let mut buf: Vec<u8> = vec![];
+    response.copy_to(&mut buf)?;
+    let encoded = base64::encode(&buf);
+    Ok(encoded)
 }
