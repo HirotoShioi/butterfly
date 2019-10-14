@@ -20,12 +20,8 @@ impl fmt::Display for ButterflyRegionError {
         let error_message = match self {
             ImageSourceNotFound => "Image source not found",
             FailedToFetchHTML => "Failed to fetch html",
-            InvalidIndexButterflyNotFound => {
-                "Index of given butterfly does not exist"
-            }
-            TextNotFound => {
-                "Text description of a butterfly could not be extracted"
-            }
+            InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
+            TextNotFound => "Text description of a butterfly could not be extracted",
             ImageNotFound => "Image could not be fetched",
             ImageNameUnknown => "Image name unknown",
             NotImage => "Downloaded file is not image file",

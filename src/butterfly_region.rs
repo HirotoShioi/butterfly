@@ -23,6 +23,7 @@ const PDF_DIRECTORY: &str = "pdf";
 /// Number of pools used for thread pool
 const THEAD_POOL_NUM: u32 = 5;
 
+/// Buttterfly struct
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Butterfly {
     /// Region
@@ -48,7 +49,7 @@ pub struct Butterfly {
 }
 
 impl Butterfly {
-    ///Creates an instance of `Butterfly`
+    /// Creates an instance of `Butterfly`
     ///
     /// `jp_name` and `eng_name` is empty due to the structure of the website
     pub fn new(
@@ -89,8 +90,10 @@ impl Butterfly {
     }
 }
 
+///Set of butterflyies
 #[derive(Debug)]
 pub struct ButterflyRegion {
+    /// Directory used to store assets
     pub dir_name: String,
     /// Name of the region
     pub region: String,
@@ -103,6 +106,7 @@ pub struct ButterflyRegion {
 }
 
 impl ButterflyRegion {
+    /// Create a new instance of `ButterflyRegion`
     pub fn new(
         dir_name: &str,
         region: &str,
@@ -156,9 +160,7 @@ impl ButterflyRegion {
         }
 
         // Use threadpool
-        use scoped_threadpool::Pool;
-
-        let mut pool = Pool::new(THEAD_POOL_NUM);
+        let mut pool = scoped_threadpool::Pool::new(THEAD_POOL_NUM);
 
         pool.scoped(|scoped| {
             for butterfly in self.butterflies.values_mut() {
@@ -166,14 +168,16 @@ impl ButterflyRegion {
                     .unwrap()
                     .join(&butterfly.img_src)
                     .unwrap();
-                scoped.execute(move || {
-                    if let Ok(mut colors) = get_dominant_colors(&img_url) {
+                scoped.execute(move || match get_dominant_colors(&img_url) {
+                    Ok(mut colors) => {
                         println!("Success {}", butterfly.jp_name);
                         butterfly.dominant_colors.append(&mut colors);
-                    } else {
+                    }
+                    Err(err) => {
                         println!("Failed {}", butterfly.jp_name);
-                        println!("Failed: {:#?}", img_url);
-                    };
+                        println!("Url: {:#?}", img_url);
+                        println!("Error: {}", err);
+                    }
                 });
             }
         });

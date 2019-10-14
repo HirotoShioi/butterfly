@@ -10,20 +10,21 @@ const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate
 const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
 
 /// Get list of `Color` using Google Cloud Vision API
-pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, Box<dyn std::error::Error>> {
+pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, CloudVisionError> {
     let response_json = use_cloud_vision_api(image_url)?;
     let extracted_color_vec = extract_colors(&response_json)?;
 
     if extracted_color_vec.is_empty() {
-        return Err(Box::new(VectorIsEmpty));
+        return Err(VectorIsEmpty);
     }
 
     Ok(extracted_color_vec)
 }
 
 /// Use cloud vision api
-fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Error>> {
-    let base64_image = get_base64_image(image_url)?;
+fn use_cloud_vision_api(image_url: &Url) -> Result<Value, CloudVisionError> {
+    let base64_image =
+        get_base64_image(image_url).ok_or(UnableToFetchImage(image_url.to_owned()))?;
 
     let request = json!({
         "requests": [
@@ -41,27 +42,28 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, Box<dyn std::error::Er
         ]
     });
 
-    let secret_key = fs::read_to_string(API_KEY_FILE_PATH)?;
+    let secret_key = fs::read_to_string(API_KEY_FILE_PATH).unwrap();
 
     let mut response = reqwest::Client::new()
         .post(CLOUD_VISION_URI)
         .query(&[("key", secret_key)])
         .json(&request)
-        .send()?;
+        .send()
+        .map_err(|_err| FailedGCV)?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(BadRequest(image_url.to_owned())));
+        return Err(BadRequest(image_url.to_owned()));
     }
 
-    let response_json: Value = response.json()?;
+    let response_json: Value = response.json().map_err(|_err| NotJSON)?;
 
     let err = &response_json["responses"][0]["error"];
 
     if err.is_object() {
         if let Some(error_message) = &err["message"].as_str() {
-            return Err(Box::new(FailedToParseImage(error_message.to_string())));
+            return Err(FailedToParseImage(error_message.to_string()));
         } else {
-            return Err(Box::new(UnknownError));
+            return Err(UnknownError);
         };
     }
 
@@ -124,23 +126,31 @@ fn to_color(value: &Value) -> Option<Color> {
 }
 
 /// Get image content and encod it with base64
-fn get_base64_image(image_url: &Url) -> Result<String, Box<dyn std::error::Error>> {
-    let mut response = reqwest::get(image_url.to_owned())?;
+fn get_base64_image(image_url: &Url) -> Option<String> {
+    let mut response = reqwest::get(image_url.to_owned()).ok()?;
+
+    if response.status() != StatusCode::OK {
+        return None;
+    }
+
     let mut buf: Vec<u8> = vec![];
-    response.copy_to(&mut buf)?;
+    response.copy_to(&mut buf).ok()?;
     let encoded = base64::encode(&buf);
-    Ok(encoded)
+    Some(encoded)
 }
 
 use super::cloud_vision::CloudVisionError::*;
 
 #[derive(Debug)]
-enum CloudVisionError {
+pub enum CloudVisionError {
+    UnableToFetchImage(Url),
     BadRequest(Url),
     FailedToParseImage(String),
     UnableToParseColorData(Value),
     UnknownError,
     VectorIsEmpty,
+    FailedGCV,
+    NotJSON,
 }
 
 impl std::error::Error for CloudVisionError {}
@@ -153,6 +163,9 @@ impl fmt::Display for CloudVisionError {
             UnableToParseColorData(val) => format!("Unable to parse data: {:#?}", val),
             UnknownError => String::from("Unknown error"),
             VectorIsEmpty => String::from("Extracted data is empty"),
+            FailedGCV => String::from("Failed to request Google Cloud Vision API"),
+            UnableToFetchImage(url) => format!("Unable to fetch image from url: {}", url),
+            NotJSON => String::from("Response body is not JSON"),
         };
         write!(f, "{}", error_message)
     }
