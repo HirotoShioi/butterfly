@@ -2,6 +2,7 @@ extern crate base64;
 
 use hex;
 use reqwest::{StatusCode, Url};
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::fmt;
 use std::fs;
@@ -90,7 +91,7 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize)]
 pub struct Color {
     pub pixel_fraction: f32,
     pub score: f32,
@@ -141,7 +142,7 @@ fn get_base64_image(image_url: &Url) -> Option<String> {
 
 use super::cloud_vision::CloudVisionError::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CloudVisionError {
     UnableToFetchImage(Url),
     BadRequest(Url),

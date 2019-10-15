@@ -2,29 +2,20 @@ extern crate scoped_threadpool;
 
 use kanaria::UCSStr;
 use reqwest::{StatusCode, Url};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use super::cloud_vision::{get_dominant_colors, Color};
+use super::constants::*;
 use super::errors::ButterflyRegionError;
 
 type Id = usize;
 
-/// Url of the website
-const BUTTERFLY_URL: &str = "http://biokite.com/worldbutterfly/";
-/// Directory which stores the downloaded files
-const ASSET_DIRECTORY: &str = "./assets";
-/// Directory which stores the images
-const IMAGE_DIRECTORY: &str = "images";
-/// Directory which store the pdf files
-const PDF_DIRECTORY: &str = "pdf";
-/// Number of pools used for thread pool
-const THEAD_POOL_NUM: u32 = 5;
-
 /// Buttterfly struct
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize)]
 pub struct Butterfly {
     /// Region
     region: String,
@@ -51,7 +42,7 @@ pub struct Butterfly {
 impl Butterfly {
     /// Creates an instance of `Butterfly`
     ///
-    /// `jp_name` and `eng_name` is empty due to the structure of the website
+    /// Initially, `jp_name` and `eng_name` is empty due to the structure of the website
     pub fn new(
         region: &str,
         img_src: &str,
@@ -106,23 +97,6 @@ pub struct ButterflyRegion {
 }
 
 impl ButterflyRegion {
-    /// Create a new instance of `ButterflyRegion`
-    pub fn new(
-        dir_name: &str,
-        region: &str,
-        url: &str,
-        butterflies: &HashMap<Id, Butterfly>,
-        pdfs: &HashSet<String>,
-    ) -> ButterflyRegion {
-        ButterflyRegion {
-            dir_name: dir_name.to_owned(),
-            region: region.to_owned(),
-            url: url.to_owned(),
-            butterflies: butterflies.to_owned(),
-            pdfs: pdfs.to_owned(),
-        }
-    }
-
     ///Fetch images of butterflies
     pub fn fetch_images(&mut self) -> &mut Self {
         if self.butterflies.is_empty() {
@@ -153,7 +127,7 @@ impl ButterflyRegion {
         self
     }
 
-    /// Use Google Cloud Vision API to fetch done
+    /// Use Google Cloud Vision API to fetch dominant colors
     pub fn fetch_dominant_colors(&mut self) -> &mut Self {
         if self.pdfs.is_empty() {
             panic!("Butterfly data has not been extracted yet!")
@@ -219,6 +193,27 @@ impl ButterflyRegion {
 
         self
     }
+
+    pub fn store_json(&mut self) -> &mut Self {
+        if self.butterflies.is_empty() {
+            panic!("Butterfly data has not been extracted yet!")
+        }
+
+        let file_name = "butterfly.json";
+
+        let dir_path = Path::new(ASSET_DIRECTORY).join(&self.dir_name);
+
+        if create_dir_all(&dir_path).is_err() {
+            remove_dir_all(&dir_path).unwrap();
+            create_dir_all(&dir_path).unwrap();
+        };
+
+        let butterflies = self.butterflies.values().collect::<Vec<&Butterfly>>();
+        let json_file = File::create(dir_path.join(file_name)).unwrap();
+        serde_json::to_writer_pretty(json_file, &butterflies).unwrap();
+
+        self
+    }
 }
 
 ///Fetch file from biokite.com and store them on a directory
@@ -255,5 +250,23 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
             io::copy(&mut response, &mut out)?;
             Ok(file_path)
         }
+    }
+}
+
+/// Create a new instance of `ButterflyRegion`
+/// Defined as function to prevent it from being exported as public API
+pub fn new_region(
+    dir_name: &str,
+    region: &str,
+    url: &str,
+    butterflies: &HashMap<Id, Butterfly>,
+    pdfs: &HashSet<String>,
+) -> ButterflyRegion {
+    ButterflyRegion {
+        dir_name: dir_name.to_owned(),
+        region: region.to_owned(),
+        url: url.to_owned(),
+        butterflies: butterflies.to_owned(),
+        pdfs: pdfs.to_owned(),
     }
 }
