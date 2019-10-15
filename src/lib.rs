@@ -7,12 +7,12 @@ extern crate serde_json;
 
 mod butterfly_region;
 mod client;
-pub mod cloud_vision;
+pub mod cloud_vision; // For testing
 mod constants;
 mod errors;
 mod webpage_parser;
 
 pub use butterfly_region::{Butterfly, ButterflyRegion};
+pub use client::Client;
 pub use errors::ButterflyRegionError;
 pub use webpage_parser::WebpageParser;
-pub use client::Client;

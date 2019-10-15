@@ -9,3 +9,5 @@ pub const IMAGE_DIRECTORY: &str = "images";
 pub const PDF_DIRECTORY: &str = "pdf";
 /// Number of pools used for thread pool
 pub const THEAD_POOL_NUM: u32 = 5;
+
+pub const CLIENT_POOL_NUM: u32 = 5;
