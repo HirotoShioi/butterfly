@@ -1,9 +1,9 @@
 use std::fmt;
 
-use super::errors::ButterflyRegionError::*;
+use super::errors::ButterflyError::*;
 
 #[derive(Debug)]
-pub enum ButterflyRegionError {
+pub enum ButterflyError {
     ImageSourceNotFound,
     TextNotFound,
     InvalidIndexButterflyNotFound,
@@ -13,9 +13,9 @@ pub enum ButterflyRegionError {
     NotImage,
 }
 
-impl std::error::Error for ButterflyRegionError {}
+impl std::error::Error for ButterflyError {}
 
-impl fmt::Display for ButterflyRegionError {
+impl fmt::Display for ButterflyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         let error_message = match self {
             ImageSourceNotFound => "Image source not found",

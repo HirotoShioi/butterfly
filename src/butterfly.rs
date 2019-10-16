@@ -2,11 +2,13 @@ use scoped_threadpool;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::Path;
+use std::time::SystemTime;
 
 use super::butterfly_region::{Butterfly, ButterflyRegion};
 use super::constants::*;
 use super::webpage_parser::WebpageParser;
 
+///Client used to fetch data from the website
 pub struct Client {
     targets: Vec<WebpageParser>,
     pool: scoped_threadpool::Pool,
@@ -18,7 +20,7 @@ impl Client {
         Client { targets, pool }
     }
 
-    pub fn fetch_datas(&mut self) -> ButterflyRegions {
+    pub fn fetch_datas(&mut self) -> ButterflyData {
         let mut regions = Vec::new();
 
         for target in self.targets.iter_mut() {
@@ -33,16 +35,18 @@ impl Client {
 
         let pool = scoped_threadpool::Pool::new(CLIENT_POOL_NUM);
 
-        ButterflyRegions { regions, pool }
+        ButterflyData { regions, pool }
     }
 }
 
-pub struct ButterflyRegions {
+/// Struct used to collect datas, files such as images, pdfs
+pub struct ButterflyData {
     regions: Vec<ButterflyRegion>,
     pool: scoped_threadpool::Pool,
 }
 
-impl ButterflyRegions {
+impl ButterflyData {
+    /// Download images from the website and store on `assets` directory
     pub fn fetch_images(&mut self) -> &mut Self {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
@@ -55,6 +59,7 @@ impl ButterflyRegions {
         self
     }
 
+    /// Download pdf files from the website and store on `assets` directory
     pub fn fetch_pdfs(&mut self) -> &mut Self {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
@@ -67,6 +72,7 @@ impl ButterflyRegions {
         self
     }
 
+    /// Use Google Cloud Vision to fetch dominant color data
     pub fn fetch_dominant_colors(&mut self) -> &mut Self {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
@@ -79,6 +85,7 @@ impl ButterflyRegions {
         self
     }
 
+    /// Convert the `ButterflyData` into `ButterflyJSON`, then store it on JSON file
     pub fn store_json(&mut self) -> Result<(), io::Error> {
         let mut butterflies = Vec::new();
 
@@ -89,14 +96,51 @@ impl ButterflyRegions {
             create_dir_all(&dir_path)?;
         };
 
+        let mut butterfly_num: usize = 0;
+        let mut pdf_num: usize = 0;
+
+        // Not ideal in terms of memory usage
         for region in self.regions.iter() {
-            let mut region_butterflies = region.butterflies.values().collect::<Vec<&Butterfly>>();
+            let mut region_butterflies = region
+                .butterflies
+                .clone()
+                .into_iter()
+                .map(|(_k, v)| v)
+                .collect::<Vec<Butterfly>>();
+            pdf_num += region.pdfs.len();
+            butterfly_num += region_butterflies.len();
             butterflies.append(&mut region_butterflies);
         }
 
+        let butterfly_json = ButterflyJSON::new(&butterflies, butterfly_num, pdf_num);
+
         let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
-        serde_json::to_writer_pretty(json_file, &butterflies)?;
+        serde_json::to_writer_pretty(json_file, &butterfly_json)?;
 
         Ok(())
+    }
+}
+
+use serde::{Deserialize, Serialize};
+
+///Struct used to export data as JSON
+#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd)]
+pub struct ButterflyJSON {
+    butterflies: Vec<Butterfly>,
+    butterfly_num: usize,
+    pdf_num: usize,
+    created_at: SystemTime,
+}
+
+impl ButterflyJSON {
+    fn new(butterflies: &Vec<Butterfly>, butterfly_num: usize, pdf_num: usize) -> Self {
+        let created_at = SystemTime::now();
+
+        ButterflyJSON {
+            butterflies: butterflies.clone(),
+            butterfly_num,
+            pdf_num,
+            created_at,
+        }
     }
 }

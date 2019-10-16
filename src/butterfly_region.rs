@@ -1,8 +1,7 @@
-extern crate scoped_threadpool;
-
 use kanaria::UCSStr;
 use reqwest::{StatusCode, Url};
-use serde::Serialize;
+use scoped_threadpool;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
@@ -10,12 +9,12 @@ use std::path::{Path, PathBuf};
 
 use super::cloud_vision::{get_dominant_colors, Color};
 use super::constants::*;
-use super::errors::ButterflyRegionError;
+use super::errors::ButterflyError;
 
 type Id = usize;
 
 /// Buttterfly struct
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct Butterfly {
     /// Region
     region: String,
@@ -82,7 +81,7 @@ impl Butterfly {
 }
 
 ///Set of butterflyies
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ButterflyRegion {
     /// Directory used to store assets
     pub dir_name: String,
@@ -134,7 +133,7 @@ impl ButterflyRegion {
         }
 
         // Use threadpool
-        let mut pool = scoped_threadpool::Pool::new(THEAD_POOL_NUM);
+        let mut pool = scoped_threadpool::Pool::new(GCV_THEAD_POOL_NUM);
 
         pool.scoped(|scoped| {
             for butterfly in self.butterflies.values_mut() {
@@ -228,7 +227,7 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(ButterflyRegionError::ImageNotFound));
+        return Err(Box::new(ButterflyError::ImageNotFound));
     }
 
     let fname = response
@@ -238,7 +237,7 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
         .and_then(|name| if name.is_empty() { None } else { Some(name) });
 
     match fname {
-        None => Err(Box::new(ButterflyRegionError::ImageNameUnknown)),
+        None => Err(Box::new(ButterflyError::ImageNameUnknown)),
         Some(name) => {
             let file_path = directory.join(name);
             //Convert to half-width since some of the are mixed with full and half width

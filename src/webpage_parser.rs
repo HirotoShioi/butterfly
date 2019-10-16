@@ -2,7 +2,7 @@ use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
 use super::butterfly_region::{new_region, Butterfly, ButterflyRegion};
-use super::errors::ButterflyRegionError;
+use super::errors::ButterflyError;
 
 // Encoding used on the butterfly website
 const WEBSITE_CHARSET: &str = "Shift-JIS";
@@ -38,8 +38,8 @@ impl WebpageParser {
     }
 
     /// Extract informations of butterflies from `url`
-    pub fn fetch_data(&mut self) -> Result<ButterflyRegion, ButterflyRegionError> {
-        let body = request_html(&self.url).map_err(|_e| ButterflyRegionError::FailedToFetchHTML)?;
+    pub fn fetch_data(&mut self) -> Result<ButterflyRegion, ButterflyError> {
+        let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
 
         let buttefly_region = new_region(
@@ -83,7 +83,7 @@ impl WebpageParser {
 
     // Return Result
     ///Parse given html and extract information from it
-    fn parse_page(&mut self, html: &str) -> Result<(), ButterflyRegionError> {
+    fn parse_page(&mut self, html: &str) -> Result<(), ButterflyError> {
         let fragment = Html::parse_document(html);
 
         // Selectors we would use for parsing
@@ -128,7 +128,7 @@ impl WebpageParser {
                                     self.insert_butterfly(src, href, &color, &category);
                                 } else {
                                     //throw error
-                                    return Err(ButterflyRegionError::ImageSourceNotFound);
+                                    return Err(ButterflyError::ImageSourceNotFound);
                                 }
                             // If a cell does not have a img source, then extract
                             // names from it
@@ -140,11 +140,11 @@ impl WebpageParser {
                                             name_id += 1;
                                         } else {
                                             return Err(
-                                                ButterflyRegionError::InvalidIndexButterflyNotFound,
+                                                ButterflyError::InvalidIndexButterflyNotFound,
                                             );
                                         };
                                     } else {
-                                        return Err(ButterflyRegionError::TextNotFound);
+                                        return Err(ButterflyError::TextNotFound);
                                     };
                                 }
                             };

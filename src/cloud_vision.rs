@@ -2,7 +2,7 @@ extern crate base64;
 
 use hex;
 use reqwest::{StatusCode, Url};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fmt;
 use std::fs;
@@ -91,7 +91,7 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct Color {
     pub pixel_fraction: f32,
     pub score: f32,

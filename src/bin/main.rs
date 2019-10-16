@@ -30,5 +30,9 @@ fn main() {
     ]);
 
     let mut regions = client.fetch_datas();
-    regions.fetch_images().fetch_pdfs().store_json();
+    regions
+        .fetch_images()
+        .fetch_pdfs()
+        .fetch_dominant_colors()
+        .store_json();
 }
