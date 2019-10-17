@@ -1,7 +1,7 @@
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
-use super::butterfly_region::{new_region, Butterfly, ButterflyRegion};
+use super::butterfly::{new_region, Butterfly, ButterflyRegion};
 use super::errors::ButterflyError;
 
 // Encoding used on the butterfly website

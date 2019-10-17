@@ -34,5 +34,6 @@ fn main() {
         .fetch_images()
         .fetch_pdfs()
         .fetch_dominant_colors()
-        .store_json();
+        .store_json()
+        .unwrap();
 }
