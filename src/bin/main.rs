@@ -29,8 +29,8 @@ fn main() {
         ),
     ]);
 
-    let mut regions = client.collect_datas();
-    regions
+    let mut butterfly_data = client.collect_datas();
+    butterfly_data
         .fetch_images()
         .fetch_pdfs()
         .fetch_dominant_colors()
