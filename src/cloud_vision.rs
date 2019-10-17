@@ -91,10 +91,14 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
     }
 }
 
+/// Color struct
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct Color {
+    /// Pixel fraction
     pub pixel_fraction: f32,
+    /// Score
     pub score: f32,
+    /// Color in hex string
     pub hex_color: String,
 }
 

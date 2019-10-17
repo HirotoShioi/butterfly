@@ -29,7 +29,7 @@ fn main() {
         ),
     ]);
 
-    let mut regions = client.fetch_datas();
+    let mut regions = client.collect_datas();
     regions
         .fetch_images()
         .fetch_pdfs()

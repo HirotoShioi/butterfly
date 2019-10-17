@@ -17,25 +17,25 @@ type Id = usize;
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct Butterfly {
     /// Region
-    region: String,
+    pub region: String,
     /// Category
-    category: String,
+    pub category: String,
     /// Url of an image
-    img_src: String,
+    pub img_src: String,
     /// Url to pdf
-    pdf_src: String,
+    pub pdf_src: String,
     /// Path to image
-    img_path: Option<String>,
+    pub img_path: Option<String>,
     /// Path to pdf file
-    pdf_path: String,
+    pub pdf_path: String,
     /// Japanese name
-    jp_name: String,
+    pub jp_name: String,
     /// English name
-    eng_name: String,
+    pub eng_name: String,
     /// Background color in 6 digit Hex
-    bgcolor: String,
+    pub bgcolor: String,
     /// List of dominant colors
-    dominant_colors: Vec<Color>,
+    pub dominant_colors: Vec<Color>,
 }
 
 impl Butterfly {

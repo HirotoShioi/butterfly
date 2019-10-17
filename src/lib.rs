@@ -30,12 +30,14 @@ pub struct Client {
 }
 
 impl Client {
+    /// Create an new instance of `Client`
     pub fn new(targets: Vec<WebpageParser>) -> Client {
         let pool = scoped_threadpool::Pool::new(CLIENT_POOL_NUM);
         Client { targets, pool }
     }
 
-    pub fn fetch_datas(&mut self) -> ButterflyData {
+    /// Collect datas from butterfly website
+    pub fn collect_datas(&mut self) -> ButterflyData {
         let mut regions = Vec::new();
 
         for target in self.targets.iter_mut() {
@@ -139,12 +141,15 @@ impl ButterflyData {
 use serde::{Deserialize, Serialize};
 
 ///Struct used to export data as JSON
-#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd, Clone)]
 pub struct ButterflyJSON {
-    butterflies: Vec<Butterfly>,
-    butterfly_num: usize,
-    pdf_num: usize,
-    created_at: SystemTime,
+    /// List of butterflies
+    pub butterflies: Vec<Butterfly>,
+    /// Number of butterfly data
+    pub butterfly_num: usize,
+    /// Number of pdf files
+    pub pdf_num: usize,
+    pub created_at: SystemTime,
 }
 
 impl ButterflyJSON {
