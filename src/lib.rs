@@ -214,7 +214,6 @@ impl ButterflyData {
                 .butterflies
                 .clone()
                 .into_iter()
-                .map(|(_k, v)| v)
                 .collect::<Vec<Butterfly>>();
             pdf_num += region.pdfs.len();
             butterfly_num += region_butterflies.len();

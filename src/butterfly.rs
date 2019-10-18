@@ -3,7 +3,7 @@ use log::{trace, warn};
 use reqwest::{StatusCode, Url};
 use scoped_threadpool;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -11,8 +11,6 @@ use std::path::{Path, PathBuf};
 use super::cloud_vision::{get_dominant_colors, Color};
 use super::constants::*;
 use super::errors::ButterflyError;
-
-type Id = usize;
 
 /// Buttterfly struct
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
@@ -91,7 +89,7 @@ pub struct ButterflyRegion {
     /// Url of region page
     pub url: String,
     /// Collections of butterflies
-    pub butterflies: HashMap<Id, Butterfly>,
+    pub butterflies: Vec<Butterfly>,
     /// Pdf collection
     pub pdfs: HashSet<String>,
 }
@@ -112,7 +110,7 @@ impl ButterflyRegion {
             create_dir_all(&dir_path).unwrap();
         };
 
-        for butterfly in self.butterflies.values_mut() {
+        for butterfly in self.butterflies.iter_mut() {
             let url = Url::parse(BUTTERFLY_URL)
                 .unwrap()
                 .join(&butterfly.img_src)
@@ -142,7 +140,7 @@ impl ButterflyRegion {
         let mut pool = scoped_threadpool::Pool::new(GCV_THEAD_POOL_NUM);
 
         pool.scoped(|scoped| {
-            for butterfly in self.butterflies.values_mut() {
+            for butterfly in self.butterflies.iter_mut() {
                 let img_url = Url::parse(BUTTERFLY_URL)
                     .unwrap()
                     .join(&butterfly.img_src)
@@ -183,7 +181,7 @@ impl ButterflyRegion {
             let url = Url::parse(BUTTERFLY_URL).unwrap().join(&pdf_url).unwrap();
             match download_file(&dir_path, url) {
                 Ok(pdf_path) => {
-                    for butterfly in self.butterflies.values_mut() {
+                    for butterfly in self.butterflies.iter_mut() {
                         if &butterfly.pdf_src == pdf_url {
                             butterfly.pdf_path.push_str(&pdf_path);
                         }
@@ -243,7 +241,7 @@ pub fn new_region(
     dir_name: &str,
     region: &str,
     url: &str,
-    butterflies: &HashMap<Id, Butterfly>,
+    butterflies: &[Butterfly],
     pdfs: &HashSet<String>,
 ) -> ButterflyRegion {
     ButterflyRegion {

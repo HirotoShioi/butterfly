@@ -43,11 +43,17 @@ impl WebpageParser {
         let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
 
+        let butterfly_vector = self
+            .butterflies
+            .values()
+            .map(|v| v.to_owned())
+            .collect::<Vec<Butterfly>>();
+
         let buttefly_region = new_region(
             &self.dir_name,
             &self.region,
             &self.url,
-            &self.butterflies,
+            &butterfly_vector,
             &self.pdfs,
         );
         Ok(buttefly_region)
