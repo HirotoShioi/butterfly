@@ -25,7 +25,7 @@ pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, CloudVisionErr
 /// Use cloud vision api
 fn use_cloud_vision_api(image_url: &Url) -> Result<Value, CloudVisionError> {
     let base64_image =
-        get_base64_image(image_url).ok_or(UnableToFetchImage(image_url.to_owned()))?;
+        get_base64_image(image_url).ok_or_else(|| UnableToFetchImage(image_url.to_owned()))?;
 
     let request = json!({
         "requests": [

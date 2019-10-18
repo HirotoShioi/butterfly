@@ -68,8 +68,10 @@
 //!            .unwrap();
 //! ```
 
+extern crate env_logger;
 extern crate hex;
 extern crate kanaria;
+extern crate log;
 extern crate reqwest;
 extern crate scoped_threadpool;
 extern crate scraper;
@@ -88,6 +90,7 @@ pub use errors::ButterflyError;
 pub use webpage_parser::WebpageParser;
 
 use constants::*;
+use log::info;
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::Path;
@@ -114,8 +117,10 @@ impl Client {
             //Proper exception handling
             self.pool.scoped(|scoped| {
                 scoped.execute(|| {
+                    info!("Extracting data from: {}", &target.region);
                     let region = target.fetch_data().unwrap();
                     regions.push(region);
+                    info!("Finished extracting data from: {}", &target.region);
                 });
             });
         }
@@ -138,7 +143,9 @@ impl ButterflyData {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
                 scoped.execute(|| {
+                    info!("Fetching images of region: {}", &region.region);
                     region.fetch_images();
+                    info!("Finished dowloading images of region: {}", &region.region);
                 });
             });
         }
@@ -151,7 +158,12 @@ impl ButterflyData {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
                 scoped.execute(|| {
+                    info!("Fetching pdf files of region: {}", &region.region);
                     region.fetch_pdfs();
+                    info!(
+                        "Finished collecting pdf files of region: {}",
+                        &region.region
+                    );
                 });
             });
         }
@@ -164,7 +176,12 @@ impl ButterflyData {
         for region in self.regions.iter_mut() {
             self.pool.scoped(|scoped| {
                 scoped.execute(|| {
+                    info!("Collecting dominant color data of: {}", &region.region);
                     region.fetch_dominant_colors();
+                    info!(
+                        "Finished collecting dominant color data of: {}",
+                        &region.region
+                    );
                 });
             });
         }
@@ -183,6 +200,11 @@ impl ButterflyData {
             create_dir_all(&dir_path)?;
         };
 
+        info!(
+            "Storing the results to json file on: {}",
+            &dir_path.to_str().unwrap()
+        );
+
         let mut butterfly_num: usize = 0;
         let mut pdf_num: usize = 0;
 
@@ -200,7 +222,6 @@ impl ButterflyData {
         }
 
         let butterfly_json = ButterflyJSON::new(&butterflies, butterfly_num, pdf_num);
-
         let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
         serde_json::to_writer_pretty(json_file, &butterfly_json)?;
 
@@ -223,11 +244,11 @@ pub struct ButterflyJSON {
 }
 
 impl ButterflyJSON {
-    fn new(butterflies: &Vec<Butterfly>, butterfly_num: usize, pdf_num: usize) -> Self {
+    fn new(butterflies: &[Butterfly], butterfly_num: usize, pdf_num: usize) -> Self {
         let created_at = SystemTime::now();
 
         ButterflyJSON {
-            butterflies: butterflies.clone(),
+            butterflies: butterflies.to_owned(),
             butterfly_num,
             pdf_num,
             created_at,

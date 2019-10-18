@@ -1,4 +1,5 @@
 use kanaria::UCSStr;
+use log::{trace, warn};
 use reqwest::{StatusCode, Url};
 use scoped_threadpool;
 use serde::{Deserialize, Serialize};
@@ -117,9 +118,14 @@ impl ButterflyRegion {
                 .join(&butterfly.img_src)
                 .unwrap();
             if let Ok(img_path) = download_file(&dir_path, url) {
+                trace!(
+                    "Storing image of {} on the path {}",
+                    &butterfly.jp_name,
+                    &img_path
+                );
                 butterfly.img_path.replace(img_path);
             } else {
-                println!("Image not found: {}", &butterfly.jp_name);
+                warn!("Image could not be fetched: {}", &butterfly.jp_name);
             };
         }
 
@@ -143,13 +149,13 @@ impl ButterflyRegion {
                     .unwrap();
                 scoped.execute(move || match get_dominant_colors(&img_url) {
                     Ok(mut colors) => {
-                        println!("Success {}", butterfly.jp_name);
+                        trace!("Managed to get dominant colors {}", butterfly.jp_name);
                         butterfly.dominant_colors.append(&mut colors);
                     }
                     Err(err) => {
-                        println!("Failed {}", butterfly.jp_name);
-                        println!("Url: {:#?}", img_url);
-                        println!("Error: {}", err);
+                        warn!("GCV request failed: {}", butterfly.jp_name);
+                        warn!("Url: {:#?}", img_url);
+                        warn!("Error: {}", err);
                     }
                 });
             }
@@ -182,34 +188,13 @@ impl ButterflyRegion {
                             butterfly.pdf_path.push_str(&pdf_path);
                         }
                     }
-                    println!("{}", pdf_path);
+                    trace!("Stored pdf file on: {}", pdf_path);
                 }
                 Err(err) => {
-                    println!("{:?}", err);
+                    trace!("Unable to download pdf file: {}", err);
                 }
             }
         }
-
-        self
-    }
-
-    pub fn store_json(&mut self) -> &mut Self {
-        if self.butterflies.is_empty() {
-            panic!("Butterfly data has not been extracted yet!")
-        }
-
-        let file_name = "butterfly.json";
-
-        let dir_path = Path::new(ASSET_DIRECTORY).join(&self.dir_name);
-
-        if create_dir_all(&dir_path).is_err() {
-            remove_dir_all(&dir_path).unwrap();
-            create_dir_all(&dir_path).unwrap();
-        };
-
-        let butterflies = self.butterflies.values().collect::<Vec<&Butterfly>>();
-        let json_file = File::create(dir_path.join(file_name)).unwrap();
-        serde_json::to_writer_pretty(json_file, &butterflies).unwrap();
 
         self
     }

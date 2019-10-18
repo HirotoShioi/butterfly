@@ -1,6 +1,14 @@
 use butterfly::{Client, WebpageParser};
+use env_logger::Builder;
+use log::LevelFilter;
 
 fn main() {
+    Builder::from_default_env()
+        .filter_level(LevelFilter::Info)
+        .default_format_module_path(false)
+        .default_format_timestamp(false)
+        .init();
+
     let mut client = Client::new(vec![
         WebpageParser::new(
             "old_north",

@@ -1,3 +1,4 @@
+use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
@@ -232,7 +233,7 @@ fn extract_color_category(
             if color == "#ffff66" {
                 "アゲハチョウ科"
             } else {
-                println!("category not found: {}", src);
+                error!("category not found: {}", src);
                 ""
             }
         }
