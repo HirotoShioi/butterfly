@@ -1,4 +1,4 @@
-use butterfly::{Client, WebpageParser};
+use butterfly_extractor::{Client, WebpageParser};
 use env_logger::Builder;
 use log::LevelFilter;
 

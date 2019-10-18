@@ -1,4 +1,4 @@
-//! # butterfly
+//! # butterfly_extractor
 //!
 //! This crate attempts to extract data from http://biokite.com/worldbutterfly/butterfly-index.htm
 //! Data include images, pdfs, both japanese and English name, as well as
