@@ -62,7 +62,7 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, CloudVisionError> {
 
     if err.is_object() {
         if let Some(error_message) = &err["message"].as_str() {
-            return Err(FailedToParseImage(error_message.to_string()));
+            return Err(FailedToParseImage((*error_message).to_string()));
         } else {
             return Err(UnknownError);
         };

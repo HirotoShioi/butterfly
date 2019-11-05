@@ -68,6 +68,7 @@
 //!            .unwrap();
 //! ```
 
+extern crate csv;
 extern crate env_logger;
 extern crate hex;
 extern crate kanaria;
@@ -138,6 +139,24 @@ pub struct ButterflyData {
 }
 
 impl ButterflyData {
+    /// Fetch csv info
+    pub fn fetch_csv_info(&mut self) -> &mut Self {
+        for region in self.regions.iter_mut() {
+            self.pool.scoped(|scoped| {
+                scoped.execute(|| {
+                    info!("Fetching informations from CSV file");
+                    region.fetch_csv_info();
+                    info!(
+                        "Finished fetching information of region: {}",
+                        &region.region
+                    );
+                })
+            })
+        }
+
+        self
+    }
+
     /// Download images from the website and store on `assets` directory
     pub fn fetch_images(&mut self) -> &mut Self {
         for region in self.regions.iter_mut() {
