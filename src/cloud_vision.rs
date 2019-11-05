@@ -114,12 +114,9 @@ fn to_color(value: &Value) -> Option<Color> {
     let green: u8 = color.get("green")?.to_owned().as_u64()? as u8;
     let blue: u8 = color.get("blue")?.to_owned().as_u64()? as u8;
 
-    //Construct hex string color
-    let mut hex_color = String::from("#");
-
     let hex = hex::encode(vec![red, green, blue]);
 
-    hex_color.push_str(&hex);
+    let hex_color = format!("#{}", hex);
 
     let color_struct = Color {
         pixel_fraction,
