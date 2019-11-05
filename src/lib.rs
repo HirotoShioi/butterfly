@@ -239,6 +239,10 @@ impl ButterflyData {
             butterflies.append(&mut region_butterflies);
         }
 
+        // Remove duplicates
+        butterflies.sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
+        butterflies.dedup_by(|b1, b2| b1.jp_name == b2.jp_name && b1.eng_name == b2.eng_name);
+
         let butterfly_json = ButterflyJSON::new(&butterflies, butterfly_num, pdf_num);
         let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
         serde_json::to_writer_pretty(json_file, &butterfly_json)?;
