@@ -49,14 +49,13 @@ impl WebpageParser {
             .map(|v| v.to_owned())
             .collect::<Vec<Butterfly>>();
 
-        let buttefly_region = new_region(
+        new_region(
             &self.dir_name,
             &self.region,
             &self.url,
             &butterfly_vector,
             &self.pdfs,
-        );
-        Ok(buttefly_region)
+        )
     }
 
     /// Insert new `Butterfly` to `butterflies`

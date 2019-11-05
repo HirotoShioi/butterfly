@@ -19,6 +19,8 @@ pub enum ButterflyError {
     ImageNameUnknown,
     /// Given data is not a image file
     NotImage,
+    ///
+    FailedToParseCSVRecord,
 }
 
 impl std::error::Error for ButterflyError {}
@@ -33,6 +35,7 @@ impl fmt::Display for ButterflyError {
             ImageNotFound => "Image could not be fetched",
             ImageNameUnknown => "Image name unknown",
             NotImage => "Downloaded file is not image file",
+            FailedToParseCSVRecord => "Failed to parse CSV record",
         };
         write!(f, "{}", error_message)
     }

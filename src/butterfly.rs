@@ -1,16 +1,23 @@
+use csv::StringRecord;
 use kanaria::UCSStr;
-use log::{trace, warn};
+use log::{info, trace, warn};
 use reqwest::{StatusCode, Url};
 use scoped_threadpool;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use super::cloud_vision::{get_dominant_colors, Color};
 use super::constants::*;
-use super::errors::ButterflyError;
+use super::errors::ButterflyError::{self, *};
+
+#[derive(Eq, Debug, PartialEq, Hash, Clone)]
+pub struct JPName(String);
+
+#[derive(Eq, Debug, PartialEq, Hash, Clone)]
+pub struct EngName(String);
 
 /// Buttterfly struct
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
@@ -33,6 +40,10 @@ pub struct Butterfly {
     pub eng_name: String,
     /// Background color in 6 digit Hex
     pub bgcolor: String,
+    pub distribution: String,
+    pub open_length: u32,
+    pub diet: Option<String>,
+    pub remarks: Option<String>,
     /// List of dominant colors
     pub dominant_colors: Vec<Color>,
 }
@@ -59,6 +70,10 @@ impl Butterfly {
             eng_name: String::new(),
             bgcolor: String::from(bgcolor),
             dominant_colors: Vec::new(),
+            distribution: String::new(),
+            open_length: 0,
+            diet: None,
+            remarks: None,
         }
     }
 
@@ -77,6 +92,61 @@ impl Butterfly {
             false
         }
     }
+
+    pub fn add_additional_data(&mut self, csv_data: &CSVData) {
+        self.distribution = csv_data.distribution.to_owned();
+        self.open_length = csv_data.open_length;
+        self.diet = csv_data.diet.to_owned();
+        self.remarks = csv_data.remarks.to_owned();
+    }
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
+pub struct CSVData {
+    distribution: String,
+    open_length: u32,
+    diet: Option<String>,
+    remarks: Option<String>,
+}
+
+impl CSVData {
+    fn new(vec: StringRecord) -> Option<((JPName, EngName), CSVData)> {
+        let eng_name = vec.get(0)?;
+        let jp_name = vec.get(1)?;
+        let open_length = vec.get(3).and_then(|num| {
+            let parsed: Option<u32> = num.parse().ok();
+            parsed
+        })?;
+
+        let distribution = vec.get(4).map(|v| v.to_owned())?;
+
+        let diet = vec.get(5).and_then(|d| {
+            if d.is_empty() {
+                None
+            } else {
+                Some(d.to_owned())
+            }
+        });
+        let remarks = vec.get(6).and_then(|r| {
+            if r.is_empty() {
+                None
+            } else {
+                Some(r.to_owned())
+            }
+        });
+
+        let csv_data = CSVData {
+            distribution,
+            open_length,
+            diet,
+            remarks,
+        };
+
+        Some((
+            (JPName(jp_name.to_owned()), EngName(eng_name.to_owned())),
+            csv_data,
+        ))
+    }
 }
 
 ///Set of butterflyies
@@ -92,9 +162,32 @@ pub struct ButterflyRegion {
     pub butterflies: Vec<Butterfly>,
     /// Pdf collection
     pub pdfs: HashSet<String>,
+    /// Datas parsed from csv file
+    pub csv_data_map: HashMap<(JPName, EngName), CSVData>,
 }
 
 impl ButterflyRegion {
+    /// Fetch data from CSV data map
+    pub fn fetch_csv_info(&mut self) -> &mut Self {
+        for butterfly in self.butterflies.iter_mut() {
+            let jp_name = JPName(butterfly.jp_name.to_owned());
+            let eng_name = EngName(butterfly.eng_name.to_owned());
+
+            let additional_data = self.csv_data_map.get(&(jp_name, eng_name));
+
+            match additional_data {
+                Some(additional_data) => {
+                    butterfly.add_additional_data(additional_data);
+                }
+                None => {
+                    warn!("Data not found: {}", butterfly.jp_name);
+                }
+            }
+        }
+
+        self
+    }
+
     ///Fetch images of butterflies
     pub fn fetch_images(&mut self) -> &mut Self {
         if self.butterflies.is_empty() {
@@ -243,12 +336,29 @@ pub fn new_region(
     url: &str,
     butterflies: &[Butterfly],
     pdfs: &HashSet<String>,
-) -> ButterflyRegion {
-    ButterflyRegion {
+) -> Result<ButterflyRegion, ButterflyError> {
+    let mut csv_data_map = HashMap::new();
+    // Read file
+    let mut cvs_file_content =
+        csv::Reader::from_path("./assets/butterfly.csv").expect("CSV file not found");
+
+    for record in cvs_file_content.records() {
+        let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
+        if let Some((key, csv_data)) = CSVData::new(record) {
+            csv_data_map.insert(key, csv_data);
+        } else {
+            return Err(FailedToParseCSVRecord);
+        };
+    }
+
+    info!("CSV file has been parsed");
+
+    Ok(ButterflyRegion {
         dir_name: dir_name.to_owned(),
         region: region.to_owned(),
         url: url.to_owned(),
         butterflies: butterflies.to_owned(),
         pdfs: pdfs.to_owned(),
-    }
+        csv_data_map,
+    })
 }

@@ -68,6 +68,7 @@
 //!            .unwrap();
 //! ```
 
+extern crate csv;
 extern crate env_logger;
 extern crate hex;
 extern crate kanaria;
@@ -138,6 +139,24 @@ pub struct ButterflyData {
 }
 
 impl ButterflyData {
+    /// Fetch csv info
+    pub fn fetch_csv_info(&mut self) -> &mut Self {
+        for region in self.regions.iter_mut() {
+            self.pool.scoped(|scoped| {
+                scoped.execute(|| {
+                    info!("Fetching informations from CSV file");
+                    region.fetch_csv_info();
+                    info!(
+                        "Finished fetching information of region: {}",
+                        &region.region
+                    );
+                })
+            })
+        }
+
+        self
+    }
+
     /// Download images from the website and store on `assets` directory
     pub fn fetch_images(&mut self) -> &mut Self {
         for region in self.regions.iter_mut() {
@@ -219,6 +238,10 @@ impl ButterflyData {
             butterfly_num += region_butterflies.len();
             butterflies.append(&mut region_butterflies);
         }
+
+        // Remove duplicates
+        butterflies.sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
+        butterflies.dedup_by(|b1, b2| b1.jp_name == b2.jp_name && b1.eng_name == b2.eng_name);
 
         let butterfly_json = ButterflyJSON::new(&butterflies, butterfly_num, pdf_num);
         let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
