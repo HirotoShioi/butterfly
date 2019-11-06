@@ -282,7 +282,7 @@ impl ButterflyRegion {
                     trace!("Stored pdf file on: {}", pdf_path);
                 }
                 Err(err) => {
-                    trace!("Unable to download pdf file: {}", err);
+                    warn!("Unable to download pdf file: {}", err);
                 }
             }
         }
