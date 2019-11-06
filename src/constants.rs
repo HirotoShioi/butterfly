@@ -11,3 +11,5 @@ pub const PDF_DIRECTORY: &str = "pdf";
 pub const GCV_THEAD_POOL_NUM: u32 = 20;
 /// Number of threads used
 pub const CLIENT_POOL_NUM: u32 = 5;
+/// Path to CSV file
+pub const CSV_FILE_PATH: &str = "./assets/butterfly.csv";

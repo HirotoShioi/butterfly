@@ -339,8 +339,7 @@ pub fn new_region(
 ) -> Result<ButterflyRegion, ButterflyError> {
     let mut csv_data_map = HashMap::new();
     // Read file
-    let mut cvs_file_content =
-        csv::Reader::from_path("./assets/butterfly.csv").expect("CSV file not found");
+    let mut cvs_file_content = csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
 
     for record in cvs_file_content.records() {
         let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
