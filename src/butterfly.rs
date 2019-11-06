@@ -203,7 +203,7 @@ impl ButterflyRegion {
             create_dir_all(&dir_path).unwrap();
         };
 
-        for butterfly in self.butterflies.iter_mut() {
+        self.butterflies.iter_mut().for_each(|butterfly| {
             let url = Url::parse(BUTTERFLY_URL)
                 .unwrap()
                 .join(&butterfly.img_src)
@@ -218,7 +218,7 @@ impl ButterflyRegion {
             } else {
                 warn!("Image could not be fetched: {}", &butterfly.jp_name);
             };
-        }
+        });
 
         self
     }
@@ -282,7 +282,7 @@ impl ButterflyRegion {
                     trace!("Stored pdf file on: {}", pdf_path);
                 }
                 Err(err) => {
-                    trace!("Unable to download pdf file: {}", err);
+                    warn!("Unable to download pdf file: {}", err);
                 }
             }
         }

@@ -73,6 +73,7 @@ extern crate env_logger;
 extern crate hex;
 extern crate kanaria;
 extern crate log;
+extern crate rayon;
 extern crate reqwest;
 extern crate scoped_threadpool;
 extern crate scraper;
@@ -92,10 +93,12 @@ pub use webpage_parser::WebpageParser;
 
 use constants::*;
 use log::info;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::Path;
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 ///Client used to fetch data from the website
 pub struct Client {
@@ -126,84 +129,65 @@ impl Client {
             });
         }
 
-        let pool = scoped_threadpool::Pool::new(CLIENT_POOL_NUM);
-
-        ButterflyData { regions, pool }
+        ButterflyData { regions }
     }
 }
 
 /// Struct used to collect datas, files such as images, pdfs
 pub struct ButterflyData {
     regions: Vec<ButterflyRegion>,
-    pool: scoped_threadpool::Pool,
 }
 
 impl ButterflyData {
     /// Fetch csv info
     pub fn fetch_csv_info(&mut self) -> &mut Self {
-        for region in self.regions.iter_mut() {
-            self.pool.scoped(|scoped| {
-                scoped.execute(|| {
-                    info!("Fetching informations from CSV file");
-                    region.fetch_csv_info();
-                    info!(
-                        "Finished fetching information of region: {}",
-                        &region.region
-                    );
-                })
-            })
-        }
+        self.regions.par_iter_mut().for_each(|region| {
+            info!("Fetching informations from CSV file");
+            region.fetch_csv_info();
+            info!(
+                "Finished fetching information of region: {}",
+                &region.region
+            );
+        });
 
         self
     }
 
     /// Download images from the website and store on `assets` directory
     pub fn fetch_images(&mut self) -> &mut Self {
-        for region in self.regions.iter_mut() {
-            self.pool.scoped(|scoped| {
-                scoped.execute(|| {
-                    info!("Fetching images of region: {}", &region.region);
-                    region.fetch_images();
-                    info!("Finished dowloading images of region: {}", &region.region);
-                });
-            });
-        }
+        self.regions.par_iter_mut().for_each(|region| {
+            info!("Fetching images of region: {}", &region.region);
+            region.fetch_images();
+            info!("Finished dowloading images of region: {}", &region.region);
+        });
 
         self
     }
 
     /// Download pdf files from the website and store on `assets` directory
     pub fn fetch_pdfs(&mut self) -> &mut Self {
-        for region in self.regions.iter_mut() {
-            self.pool.scoped(|scoped| {
-                scoped.execute(|| {
-                    info!("Fetching pdf files of region: {}", &region.region);
-                    region.fetch_pdfs();
-                    info!(
-                        "Finished collecting pdf files of region: {}",
-                        &region.region
-                    );
-                });
-            });
-        }
+        self.regions.par_iter_mut().for_each(|region| {
+            info!("Fetching pdf files of region: {}", &region.region);
+            region.fetch_pdfs();
+            info!(
+                "Finished collecting pdf files of region: {}",
+                &region.region
+            );
+        });
 
         self
     }
 
     /// Use Google Cloud Vision to fetch dominant color data
     pub fn fetch_dominant_colors(&mut self) -> &mut Self {
-        for region in self.regions.iter_mut() {
-            self.pool.scoped(|scoped| {
-                scoped.execute(|| {
-                    info!("Collecting dominant color data of: {}", &region.region);
-                    region.fetch_dominant_colors();
-                    info!(
-                        "Finished collecting dominant color data of: {}",
-                        &region.region
-                    );
-                });
-            });
-        }
+        self.regions.par_iter_mut().for_each(|region| {
+            info!("Collecting dominant color data of: {}", &region.region);
+            region.fetch_dominant_colors();
+            info!(
+                "Finished collecting dominant color data of: {}",
+                &region.region
+            );
+        });
 
         self
     }
@@ -228,16 +212,12 @@ impl ButterflyData {
         let mut pdf_num: usize = 0;
 
         // Not ideal in terms of memory usage
-        for region in self.regions.iter() {
-            let mut region_butterflies = region
-                .butterflies
-                .clone()
-                .into_iter()
-                .collect::<Vec<Butterfly>>();
+        self.regions.iter().for_each(|region| {
+            let mut region_butterflies = region.butterflies.clone();
             pdf_num += region.pdfs.len();
             butterfly_num += region_butterflies.len();
             butterflies.append(&mut region_butterflies);
-        }
+        });
 
         // Remove duplicates
         butterflies.sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
@@ -251,8 +231,6 @@ impl ButterflyData {
     }
 }
 
-use serde::{Deserialize, Serialize};
-
 ///Struct used to export data as JSON
 #[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd, Clone)]
 pub struct ButterflyJSON {
@@ -262,12 +240,12 @@ pub struct ButterflyJSON {
     pub butterfly_num: usize,
     /// Number of pdf files
     pub pdf_num: usize,
-    pub created_at: SystemTime,
+    pub created_at: u64,
 }
 
 impl ButterflyJSON {
     fn new(butterflies: &[Butterfly], butterfly_num: usize, pdf_num: usize) -> Self {
-        let created_at = SystemTime::now();
+        let created_at = now();
 
         ButterflyJSON {
             butterflies: butterflies.to_owned(),
@@ -276,4 +254,12 @@ impl ButterflyJSON {
             created_at,
         }
     }
+}
+
+fn now() -> u64 {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    since_the_epoch.as_secs()
 }

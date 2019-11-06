@@ -79,11 +79,11 @@ fn extract_colors(val: &Value) -> Result<Vec<Color>, CloudVisionError> {
         Some(color_ary) => {
             let mut color_vec = Vec::new();
 
-            for color_value in color_ary.iter() {
+            color_ary.iter().for_each(|color_value| {
                 if let Some(color) = to_color(color_value) {
                     color_vec.push(color);
                 };
-            }
+            });
             Ok(color_vec)
         }
 
