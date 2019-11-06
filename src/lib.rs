@@ -212,16 +212,12 @@ impl ButterflyData {
         let mut pdf_num: usize = 0;
 
         // Not ideal in terms of memory usage
-        for region in self.regions.iter() {
-            let mut region_butterflies = region
-                .butterflies
-                .clone()
-                .into_iter()
-                .collect::<Vec<Butterfly>>();
+        self.regions.iter().for_each(|region| {
+            let mut region_butterflies = region.butterflies.clone();
             pdf_num += region.pdfs.len();
             butterfly_num += region_butterflies.len();
             butterflies.append(&mut region_butterflies);
-        }
+        });
 
         // Remove duplicates
         butterflies.sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
