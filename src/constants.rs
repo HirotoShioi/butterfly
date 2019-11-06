@@ -8,6 +8,6 @@ pub const IMAGE_DIRECTORY: &str = "images";
 /// Directory which store the pdf files
 pub const PDF_DIRECTORY: &str = "pdf";
 /// Number of threads used for fetching google cloud vision api
-pub const GCV_THEAD_POOL_NUM: u32 = 5;
+pub const GCV_THEAD_POOL_NUM: u32 = 20;
 /// Number of threads used
 pub const CLIENT_POOL_NUM: u32 = 5;
