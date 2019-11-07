@@ -103,14 +103,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 ///Client used to fetch data from the website
 pub struct Client {
     targets: Vec<WebpageParser>,
-    pool: scoped_threadpool::Pool,
 }
 
 impl Client {
     /// Create an new instance of `Client`
     pub fn new(targets: Vec<WebpageParser>) -> Client {
-        let pool = scoped_threadpool::Pool::new(CLIENT_POOL_NUM);
-        Client { targets, pool }
+        Client { targets }
     }
 
     /// Collect datas from butterfly website
@@ -118,9 +116,8 @@ impl Client {
         let mut regions = Vec::new();
 
         for target in self.targets.iter_mut() {
-            //Proper exception handling
-            self.pool.scoped(|scoped| {
-                scoped.execute(|| {
+            rayon::scope(|s| {
+                s.spawn(|_| {
                     info!("Extracting data from: {}", &target.region);
                     let region = target.fetch_data().unwrap();
                     regions.push(region);
@@ -211,7 +208,6 @@ impl ButterflyData {
         let mut butterfly_num: usize = 0;
         let mut pdf_num: usize = 0;
 
-        // Not ideal in terms of memory usage
         self.regions.iter().for_each(|region| {
             let mut region_butterflies = region.butterflies.clone();
             pdf_num += region.pdfs.len();
