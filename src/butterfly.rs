@@ -303,7 +303,7 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(ButterflyError::ImageNotFound));
+        return Err(Box::new(ButterflyError::FileNotFound));
     }
 
     let fname = response
@@ -313,7 +313,7 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
         .and_then(|name| if name.is_empty() { None } else { Some(name) });
 
     match fname {
-        None => Err(Box::new(ButterflyError::ImageNameUnknown)),
+        None => Err(Box::new(ButterflyError::FileNameUnknown)),
         Some(name) => {
             let file_path = directory.join(name);
             //Convert to half-width since some of the are mixed with full and half width

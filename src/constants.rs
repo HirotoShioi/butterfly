@@ -10,4 +10,4 @@ pub const PDF_DIRECTORY: &str = "pdf";
 /// Number of threads used for fetching google cloud vision api
 pub const GCV_THEAD_POOL_NUM: u32 = 20;
 /// Path to CSV file
-pub const CSV_FILE_PATH: &str = "./assets/butterfly.csv";
+pub const CSV_FILE_PATH: &str = "./butterfly.csv";
