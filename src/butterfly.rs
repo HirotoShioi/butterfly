@@ -1,8 +1,11 @@
 use csv::StringRecord;
 use kanaria::UCSStr;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use super::cloud_vision::Color;
+use super::constants::*;
+use super::errors::ButterflyError::{self, *};
 
 #[derive(Eq, Debug, PartialEq, Hash, Clone)]
 pub struct JPName(pub String);
@@ -146,4 +149,21 @@ impl CSVData {
             csv_data,
         ))
     }
+}
+
+pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, ButterflyError> {
+    let mut csv_data_map = HashMap::new();
+    // Read file
+    let mut cvs_file_content = csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
+
+    for record in cvs_file_content.records() {
+        let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
+        if let Some((key, csv_data)) = CSVData::new(record) {
+            csv_data_map.insert(key, csv_data);
+        } else {
+            return Err(FailedToParseCSVRecord);
+        };
+    }
+
+    Ok(csv_data_map)
 }

@@ -5,11 +5,11 @@ use scoped_threadpool;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
-use std::io;
+use std::io::{self, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::butterfly::{Butterfly, CSVData, EngName, JPName};
+use super::butterfly::{fetch_csv_data, Butterfly, CSVData, EngName, JPName};
 use super::cloud_vision::get_dominant_colors;
 use super::constants::*;
 use super::errors::ButterflyError::{self, *};
@@ -29,23 +29,23 @@ pub struct ButterflyCollector {
 }
 
 impl ButterflyCollector {
+    pub fn from_path<P: AsRef<Path>>(json_path: P) -> Result<ButterflyCollector, ButterflyError> {
+        // Open the file in read-only mode with buffer.
+        let file = File::open(json_path).map_err(|_| JsonFileNotFound)?;
+        let reader = BufReader::new(file);
+
+        // Read the JSON contents of the file as an instance of `User`.
+        let butterfly_json: ButterflyJSON =
+            serde_json::from_reader(reader).map_err(|_f| FailedToParseJson)?;
+
+        butterfly_json.into_collector()
+    }
+
     pub fn new(parse_results: Vec<WebpageParser>) -> Result<ButterflyCollector, ButterflyError> {
         let mut butterflies: Vec<Butterfly> = Vec::new();
         let mut pdfs: HashSet<(String, String)> = HashSet::new();
-        let mut csv_data_map = HashMap::new();
         let mut regions: Vec<String> = Vec::new();
-        // Read file
-        let mut cvs_file_content =
-            csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
-
-        for record in cvs_file_content.records() {
-            let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
-            if let Some((key, csv_data)) = CSVData::new(record) {
-                csv_data_map.insert(key, csv_data);
-            } else {
-                return Err(FailedToParseCSVRecord);
-            };
-        }
+        let csv_data_map = fetch_csv_data().map_err(|_e| FailedToParseCSVRecord)?;
 
         for result in parse_results.into_iter() {
             let mut butterfly_vector = result
@@ -302,6 +302,32 @@ impl ButterflyJSON {
             created_at,
         }
     }
+
+    fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
+        let csv_data_map = fetch_csv_data().map_err(|_| FailedToParseCSVRecord)?;
+
+        let mut regions: HashSet<String> = HashSet::new();
+        let mut butterflies: Vec<Butterfly> = Vec::new();
+        let mut pdfs: HashSet<(String, String)> = HashSet::new();
+
+        // self.pdfs
+        // .insert((href.to_owned(), self.dir_name.to_owned()));
+
+        for butterfly in self.butterflies.into_iter() {
+            regions.insert(butterfly.region.to_owned());
+            pdfs.insert((butterfly.pdf_src.to_owned(), butterfly.dir_name.to_owned()));
+            butterflies.push(butterfly.to_owned());
+        }
+
+        let regions: Vec<String> = regions.into_iter().collect();
+
+        Ok(ButterflyCollector {
+            butterflies,
+            pdfs,
+            csv_data_map,
+            regions,
+        })
+    }
 }
 
 fn now() -> u64 {
@@ -314,7 +340,7 @@ fn now() -> u64 {
 
 fn get_file_name(url_path: &str) -> Option<String> {
     url_path
-        .split("/")
+        .split('/')
         .last()
         .map(|name| UCSStr::from_str(name).narrow().to_string())
 }

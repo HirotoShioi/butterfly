@@ -43,7 +43,7 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, CloudVisionError> {
     });
 
     let secret_key = fs::read_to_string(API_KEY_FILE_PATH)
-        .map_err(|_| return KeyFileNotFound(API_KEY_FILE_PATH.to_owned()))?;
+        .map_err(|_| KeyFileNotFound(API_KEY_FILE_PATH.to_owned()))?;
 
     let mut response = reqwest::Client::new()
         .post(CLOUD_VISION_URI)
