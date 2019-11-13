@@ -24,6 +24,8 @@ pub struct ButterflyCollector {
     pub pdfs: HashSet<(String, String)>,
     /// Datas parsed from csv file
     pub csv_data_map: HashMap<(JPName, EngName), CSVData>,
+    ///
+    pub regions: Vec<String>,
 }
 
 impl ButterflyCollector {
@@ -31,6 +33,7 @@ impl ButterflyCollector {
         let mut butterflies: Vec<Butterfly> = Vec::new();
         let mut pdfs: HashSet<(String, String)> = HashSet::new();
         let mut csv_data_map = HashMap::new();
+        let mut regions: Vec<String> = Vec::new();
         // Read file
         let mut cvs_file_content =
             csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
@@ -53,19 +56,7 @@ impl ButterflyCollector {
 
             butterflies.append(&mut butterfly_vector);
 
-            let dir_path = Path::new(ASSET_DIRECTORY).join(result.dir_name.to_owned());
-            let img_path = Path::new(&dir_path).join(IMAGE_DIRECTORY);
-            let pdf_path = Path::new(&dir_path).join(PDF_DIRECTORY);
-
-            if create_dir_all(&img_path).is_err() {
-                remove_dir_all(&img_path).unwrap();
-                create_dir_all(&img_path).unwrap();
-            };
-
-            if create_dir_all(&pdf_path).is_err() {
-                remove_dir_all(&pdf_path).unwrap();
-                create_dir_all(&pdf_path).unwrap();
-            };
+            regions.push(result.dir_name);
 
             for pdf in result.pdfs.into_iter() {
                 pdfs.insert(pdf);
@@ -76,6 +67,7 @@ impl ButterflyCollector {
             butterflies,
             pdfs,
             csv_data_map,
+            regions,
         })
     }
 
@@ -104,6 +96,17 @@ impl ButterflyCollector {
     pub fn fetch_images(&mut self) -> &mut Self {
         if self.butterflies.is_empty() {
             panic!("Butterfly data has not been extracted!")
+        }
+
+        for region_name in self.regions.iter() {
+            let dir_path = Path::new(ASSET_DIRECTORY).join(region_name.to_owned());
+
+            let img_path = Path::new(&dir_path).join(IMAGE_DIRECTORY);
+
+            if create_dir_all(&img_path).is_err() {
+                remove_dir_all(&img_path).unwrap();
+                create_dir_all(&img_path).unwrap();
+            };
         }
 
         let mut pool = scoped_threadpool::Pool::new(100);
@@ -161,9 +164,9 @@ impl ButterflyCollector {
                     .unwrap();
 
                 scoped.execute(move || match get_dominant_colors(&img_url) {
-                    Ok(mut colors) => {
-                        info!("Analyzed image data of {}", butterfly.jp_name);
-                        butterfly.dominant_colors.append(&mut colors);
+                    Ok(colors) => {
+                        trace!("Analyzed image data of {}", butterfly.jp_name);
+                        butterfly.dominant_colors = colors;
                     }
                     Err(err) => {
                         warn!("GCV request failed: {}", butterfly.jp_name);
@@ -187,6 +190,17 @@ impl ButterflyCollector {
 
         info!("Downloading pdf files");
 
+        for region_name in self.regions.iter() {
+            let dir_path = Path::new(ASSET_DIRECTORY).join(region_name.to_owned());
+
+            let img_path = Path::new(&dir_path).join(PDF_DIRECTORY);
+
+            if create_dir_all(&img_path).is_err() {
+                remove_dir_all(&img_path).unwrap();
+                create_dir_all(&img_path).unwrap();
+            };
+        }
+
         for (pdf_url, dir_name) in self.pdfs.iter() {
             let dir_path = Path::new(ASSET_DIRECTORY)
                 .join(&dir_name)
@@ -198,7 +212,7 @@ impl ButterflyCollector {
                 Ok(pdf_path) => {
                     for butterfly in self.butterflies.iter_mut() {
                         if &butterfly.pdf_src == pdf_url {
-                            butterfly.pdf_path.push_str(&pdf_path);
+                            butterfly.pdf_path = pdf_path.to_owned();
                         }
                     }
                     trace!("Stored pdf file on: {}", pdf_path);
@@ -273,6 +287,7 @@ pub struct ButterflyJSON {
     pub butterfly_num: usize,
     /// Number of pdf files
     pub pdf_num: usize,
+    /// Posix time
     pub created_at: u64,
 }
 
