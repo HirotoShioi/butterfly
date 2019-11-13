@@ -82,6 +82,7 @@ extern crate serde_json;
 
 mod butterfly;
 mod butterfly_collector;
+mod client;
 mod cloud_vision;
 mod constants;
 mod errors;
@@ -89,6 +90,7 @@ mod webpage_parser;
 
 pub use butterfly::Butterfly;
 pub use butterfly_collector::ButterflyCollector;
+pub use client::Client;
 pub use cloud_vision::Color;
 pub use errors::ButterflyError;
-pub use webpage_parser::{Client, WebpageParser};
+pub use webpage_parser::WebpageParser;

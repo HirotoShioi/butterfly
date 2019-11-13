@@ -1,39 +1,12 @@
-use log::{error, info};
+use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
 use super::butterfly::Butterfly;
-use super::butterfly_collector::ButterflyCollector;
-use super::errors::ButterflyError::{self, *};
+use super::errors::ButterflyError;
 
 // Encoding used on the butterfly website
 const WEBSITE_CHARSET: &str = "Shift-JIS";
-
-///Client used to fetch data from the website
-pub struct Client {
-    targets: Vec<WebpageParser>,
-}
-
-impl Client {
-    /// Create an new instance of `Client`
-    pub fn new(targets: Vec<WebpageParser>) -> Client {
-        Client { targets }
-    }
-
-    /// Collect datas from butterfly website
-    pub fn collect_datas(&mut self) -> Result<ButterflyCollector, ButterflyError> {
-        let mut results = Vec::new();
-
-        for target in self.targets.iter_mut() {
-            info!("Extracting data from: {}", &target.region);
-            let result = target.fetch_data().map_err(|_| FailedToFetchHTML)?;
-            results.push(result.to_owned());
-            info!("Finished extracting data from: {}", &target.region);
-        }
-
-        ButterflyCollector::from_parse_result(results)
-    }
-}
 
 type Id = usize;
 

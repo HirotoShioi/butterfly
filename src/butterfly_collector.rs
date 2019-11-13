@@ -5,7 +5,7 @@ use scoped_threadpool;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
-use std::io::{self, BufReader};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -29,18 +29,6 @@ pub struct ButterflyCollector {
 }
 
 impl ButterflyCollector {
-    pub fn from_path<P: AsRef<Path>>(json_path: P) -> Result<ButterflyCollector, ButterflyError> {
-        // Open the file in read-only mode with buffer.
-        let file = File::open(json_path).map_err(|_| return JsonFileNotFound)?;
-        let reader = BufReader::new(file);
-
-        // Read the JSON contents of the file as an instance of `User`.
-        let butterfly_json: ButterflyJSON =
-            serde_json::from_reader(reader).map_err(|_f| return FailedToParseJson)?;
-
-        butterfly_json.into_collector()
-    }
-
     pub fn from_parse_result(
         parse_results: Vec<WebpageParseResult>,
     ) -> Result<ButterflyCollector, ButterflyError> {
@@ -305,7 +293,7 @@ impl ButterflyJSON {
         }
     }
 
-    fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
+    pub fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
         let csv_data_map = fetch_csv_data().map_err(|_| FailedToParseCSVRecord)?;
 
         let mut regions: HashSet<String> = HashSet::new();
