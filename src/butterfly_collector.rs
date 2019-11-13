@@ -1,3 +1,9 @@
+//! # Butterfly Collector
+//! 
+//! This module exports `ButterflyCollector` which is used to retrieve assets
+//! based upon the data that were previously extraced. You can chain the methods. 
+//! 
+//! You should call `store_json` when all the data has been acquired.
 use kanaria::UCSStr;
 use log::{info, trace, warn};
 use reqwest::{StatusCode, Url};
@@ -16,7 +22,12 @@ use super::errors::ButterflyError::{self, *};
 use super::webpage_parser::WebpageParseResult;
 
 #[derive(Debug, Clone)]
-///Set of butterflyies
+/// # Butterfly Collector
+/// 
+/// This module exports `ButterflyCollector` which is used to retrieve assets
+/// based upon the data that were previously extraced. You can chain the methods. 
+/// 
+/// You should call `store_json` when all the data has been acquired.
 pub struct ButterflyCollector {
     /// Collections of butterflies
     pub butterflies: Vec<Butterfly>,
@@ -29,6 +40,7 @@ pub struct ButterflyCollector {
 }
 
 impl ButterflyCollector {
+    /// Create new instance of `ButterflyCollector` from given `Vec<WebpageParseResult>`
     pub fn from_parse_result(
         parse_results: Vec<WebpageParseResult>,
     ) -> Result<ButterflyCollector, ButterflyError> {
@@ -218,6 +230,7 @@ impl ButterflyCollector {
         self
     }
 
+    /// Store the result as JSON file as `JSON_FILE_NAME`
     pub fn store_json(&mut self) -> Result<(), std::io::Error> {
         let dir_path = Path::new(ASSET_DIRECTORY);
 
@@ -282,6 +295,7 @@ pub struct ButterflyJSON {
 }
 
 impl ButterflyJSON {
+    /// Create an instance of `ButterflyJSON`
     fn new(butterflies: &[Butterfly], butterfly_num: usize, pdf_num: usize) -> Self {
         let created_at = now();
 
@@ -293,6 +307,7 @@ impl ButterflyJSON {
         }
     }
 
+    /// Convert itself into `ButterflyCollector`
     pub fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
         let csv_data_map = fetch_csv_data().map_err(|_| FailedToParseCSVRecord)?;
 
@@ -320,6 +335,7 @@ impl ButterflyJSON {
     }
 }
 
+/// Return current POSIX time
 fn now() -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start
@@ -328,6 +344,7 @@ fn now() -> u64 {
     since_the_epoch.as_secs()
 }
 
+/// Extract file name from given `url_path`
 fn get_file_name(url_path: &str) -> Option<String> {
     url_path
         .split("/")

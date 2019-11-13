@@ -19,11 +19,15 @@ pub enum ButterflyError {
     ImageNameUnknown,
     /// Given data is not a image file
     NotImage,
-    ///
+    /// Failed to parse CSV file
     FailedToParseCSVRecord,
+    /// File not found
     FileNotFound,
+    /// File name was unknown
     FileNameUnknown,
+    /// JSON file not found
     JsonFileNotFound,
+    /// Failed to parse JSON file
     FailedToParseJson,
 }
 

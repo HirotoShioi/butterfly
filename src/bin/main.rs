@@ -42,10 +42,7 @@ fn main() {
         .fetch_csv_info()
         .fetch_images()
         .fetch_pdfs()
-        // .fetch_dominant_colors()
+        .fetch_dominant_colors()
         .store_json()
         .unwrap();
-    // .fetch_dominant_colors()
-    // .store_json()
-    // .unwrap();
 }

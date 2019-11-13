@@ -93,6 +93,7 @@ impl Butterfly {
         }
     }
 
+    /// Add datas from CSV file
     pub fn add_additional_data(&mut self, csv_data: &CSVData) {
         self.distribution = csv_data.distribution.to_owned();
         self.open_length = csv_data.open_length;
@@ -103,6 +104,7 @@ impl Butterfly {
 
 // Place it in seperate module
 
+/// CSV data extracted from `butterfly.csv`
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct CSVData {
     distribution: String,
@@ -112,6 +114,7 @@ pub struct CSVData {
 }
 
 impl CSVData {
+    /// Create an new instance of `CSVData`
     pub fn new(vec: StringRecord) -> Option<((JPName, EngName), CSVData)> {
         let eng_name = vec.get(0)?;
         let jp_name = vec.get(1)?;
@@ -151,6 +154,7 @@ impl CSVData {
     }
 }
 
+/// Fetch `CSVData` from CSV file in which the filepath is `CSV_FILE_PATH`
 pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, ButterflyError> {
     let mut csv_data_map = HashMap::new();
     // Read file

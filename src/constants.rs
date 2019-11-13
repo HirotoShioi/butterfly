@@ -11,7 +11,7 @@ pub const PDF_DIRECTORY: &str = "pdf";
 pub const GCV_THEAD_POOL_NUM: u32 = 10;
 /// Path to CSV file
 pub const CSV_FILE_PATH: &str = "./butterfly.csv";
-
+/// Google Cloud Vision API
 pub const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
-
+/// Path to API key
 pub const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";

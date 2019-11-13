@@ -1,3 +1,8 @@
+//! # Webpage Parser
+//! 
+//! This module exports modules which are used to extract data from
+//! butterfly website
+ 
 use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
@@ -72,7 +77,6 @@ impl WebpageParseResult {
         }
     }
 
-    // Return Result
     ///Parse given html and extract information from it
     fn parse_page(&mut self, html: &str) -> Result<(), ButterflyError> {
         let fragment = Html::parse_document(html);
@@ -156,7 +160,7 @@ impl WebpageParseResult {
     }
 }
 
-/// Collections of butterflies categorized by its regions
+/// This struct is used to initialize web parsing extraction process
 #[derive(Debug, Clone)]
 pub struct WebpageParser {
     /// Directory name to store assets
