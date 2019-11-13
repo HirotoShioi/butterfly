@@ -1,8 +1,8 @@
 //! # Webpage Parser
-//! 
+//!
 //! This module exports modules which are used to extract data from
 //! butterfly website
- 
+
 use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};

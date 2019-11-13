@@ -1,8 +1,8 @@
 //! # Butterfly Collector
-//! 
+//!
 //! This module exports `ButterflyCollector` which is used to retrieve assets
-//! based upon the data that were previously extraced. You can chain the methods. 
-//! 
+//! based upon the data that were previously extraced. You can chain the methods.
+//!
 //! You should call `store_json` when all the data has been acquired.
 use kanaria::UCSStr;
 use log::{info, trace, warn};
@@ -15,18 +15,19 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::butterfly::{fetch_csv_data, Butterfly, CSVData, EngName, JPName};
+use super::butterfly::Butterfly;
 use super::cloud_vision::get_dominant_colors;
 use super::constants::*;
+use super::csv_data::{fetch_csv_data, CSVData, EngName, JPName};
 use super::errors::ButterflyError::{self, *};
 use super::webpage_parser::WebpageParseResult;
 
 #[derive(Debug, Clone)]
 /// # Butterfly Collector
-/// 
+///
 /// This module exports `ButterflyCollector` which is used to retrieve assets
-/// based upon the data that were previously extraced. You can chain the methods. 
-/// 
+/// based upon the data that were previously extraced. You can chain the methods.
+///
 /// You should call `store_json` when all the data has been acquired.
 pub struct ButterflyCollector {
     /// Collections of butterflies
@@ -79,11 +80,11 @@ impl ButterflyCollector {
             let jp_name = JPName(butterfly.jp_name.to_owned());
             let eng_name = EngName(butterfly.eng_name.to_owned());
 
-            let additional_data = self.csv_data_map.get(&(jp_name, eng_name));
+            let csv_data = self.csv_data_map.get(&(jp_name, eng_name));
 
-            match additional_data {
+            match csv_data {
                 Some(additional_data) => {
-                    butterfly.add_additional_data(additional_data);
+                    butterfly.add_csv_data(additional_data);
                 }
                 None => {
                     warn!("Data not found: {}", butterfly.jp_name);
