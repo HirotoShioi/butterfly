@@ -1,8 +1,13 @@
+//! # Webpage Parser
+//! 
+//! This module exports modules which are used to extract data from
+//! butterfly website
+ 
 use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
-use super::butterfly::{new_region, Butterfly, ButterflyRegion};
+use super::butterfly::Butterfly;
 use super::errors::ButterflyError;
 
 // Encoding used on the butterfly website
@@ -10,9 +15,8 @@ const WEBSITE_CHARSET: &str = "Shift-JIS";
 
 type Id = usize;
 
-/// Collections of butterflies categorized by its regions
 #[derive(Debug, Clone)]
-pub struct WebpageParser {
+pub struct WebpageParseResult {
     /// Directory name to store assets
     pub dir_name: String,
     /// Name of the region
@@ -22,40 +26,18 @@ pub struct WebpageParser {
     /// Collections of butterflies
     pub butterflies: HashMap<Id, Butterfly>,
     /// Pdf collection
-    pub pdfs: HashSet<String>,
+    pub pdfs: HashSet<(String, String)>,
 }
 
-impl WebpageParser {
-    /// Create an instance of `ButterflyRegion`
-    pub fn new(dir_name: &str, region: &str, url: &str) -> WebpageParser {
-        let butterflies = HashMap::new();
-        WebpageParser {
-            dir_name: dir_name.to_string(),
-            region: region.to_string(),
-            url: url.to_string(),
-            butterflies,
+impl WebpageParseResult {
+    fn new(parser: &mut WebpageParser) -> Self {
+        WebpageParseResult {
+            dir_name: parser.dir_name.to_owned(),
+            region: parser.region.to_owned(),
+            url: parser.url.to_owned(),
+            butterflies: HashMap::new(),
             pdfs: HashSet::new(),
         }
-    }
-
-    /// Extract informations of butterflies from `url`
-    pub fn fetch_data(&mut self) -> Result<ButterflyRegion, ButterflyError> {
-        let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
-        self.parse_page(&body)?;
-
-        let butterfly_vector = self
-            .butterflies
-            .values()
-            .map(|v| v.to_owned())
-            .collect::<Vec<Butterfly>>();
-
-        new_region(
-            &self.dir_name,
-            &self.region,
-            &self.url,
-            &butterfly_vector,
-            &self.pdfs,
-        )
     }
 
     /// Insert new `Butterfly` to `butterflies`
@@ -65,11 +47,19 @@ impl WebpageParser {
         pdf_src: &str,
         color: &str,
         category: &str,
-    ) -> Option<&mut WebpageParser> {
+    ) -> Option<&mut WebpageParseResult> {
         let id = self.butterflies.len();
         match self.butterflies.insert(
             id,
-            Butterfly::new(&self.region, img_src, pdf_src, color, category),
+            Butterfly::new(
+                &self.region,
+                img_src,
+                pdf_src,
+                color,
+                category,
+                &self.dir_name,
+                &self.url,
+            ),
         ) {
             Some(_old_val) => None,
             None => Some(self),
@@ -87,7 +77,6 @@ impl WebpageParser {
         }
     }
 
-    // Return Result
     ///Parse given html and extract information from it
     fn parse_page(&mut self, html: &str) -> Result<(), ButterflyError> {
         let fragment = Html::parse_document(html);
@@ -130,7 +119,8 @@ impl WebpageParser {
                                         .value()
                                         .attr("href")
                                         .unwrap();
-                                    self.pdfs.insert(href.to_owned());
+                                    self.pdfs
+                                        .insert((href.to_owned(), self.dir_name.to_owned()));
                                     self.insert_butterfly(src, href, &color, &category);
                                 } else {
                                     //throw error
@@ -167,6 +157,37 @@ impl WebpageParser {
         }
 
         Ok(())
+    }
+}
+
+/// This struct is used to initialize web parsing extraction process
+#[derive(Debug, Clone)]
+pub struct WebpageParser {
+    /// Directory name to store assets
+    pub dir_name: String,
+    /// Name of the region
+    pub region: String,
+    /// Url of region page
+    pub url: String,
+}
+
+impl WebpageParser {
+    /// Create an instance of `ButterflyRegion`
+    pub fn new(dir_name: &str, region: &str, url: &str) -> WebpageParser {
+        WebpageParser {
+            dir_name: dir_name.to_string(),
+            region: region.to_string(),
+            url: url.to_string(),
+        }
+    }
+
+    /// Extract informations of butterflies from `url`
+    pub fn fetch_data(&mut self) -> Result<WebpageParseResult, ButterflyError> {
+        let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
+        let mut result = WebpageParseResult::new(self);
+        result.parse_page(&body)?;
+
+        Ok(result)
     }
 }
 
