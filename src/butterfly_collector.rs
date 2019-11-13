@@ -15,8 +15,8 @@ use super::constants::*;
 use super::errors::ButterflyError::{self, *};
 use super::webpage_parser::WebpageParser;
 
-///Set of butterflyies
 #[derive(Debug, Clone)]
+///Set of butterflyies
 pub struct ButterflyCollector {
     /// Collections of butterflies
     pub butterflies: Vec<Butterfly>,
@@ -24,7 +24,6 @@ pub struct ButterflyCollector {
     pub pdfs: HashSet<(String, String)>,
     /// Datas parsed from csv file
     pub csv_data_map: HashMap<(JPName, EngName), CSVData>,
-    // thread pool here
 }
 
 impl ButterflyCollector {
@@ -54,13 +53,18 @@ impl ButterflyCollector {
 
             butterflies.append(&mut butterfly_vector);
 
-            let dir_path = Path::new(ASSET_DIRECTORY)
-                .join(result.dir_name.to_owned())
-                .join(PDF_DIRECTORY);
+            let dir_path = Path::new(ASSET_DIRECTORY).join(result.dir_name.to_owned());
+            let img_path = Path::new(&dir_path).join(IMAGE_DIRECTORY);
+            let pdf_path = Path::new(&dir_path).join(PDF_DIRECTORY);
 
-            if create_dir_all(&dir_path).is_err() {
-                remove_dir_all(&dir_path).unwrap();
-                create_dir_all(&dir_path).unwrap();
+            if create_dir_all(&img_path).is_err() {
+                remove_dir_all(&img_path).unwrap();
+                create_dir_all(&img_path).unwrap();
+            };
+
+            if create_dir_all(&pdf_path).is_err() {
+                remove_dir_all(&pdf_path).unwrap();
+                create_dir_all(&pdf_path).unwrap();
             };
 
             for pdf in result.pdfs.into_iter() {
@@ -102,26 +106,37 @@ impl ButterflyCollector {
             panic!("Butterfly data has not been extracted!")
         }
 
-        self.butterflies.iter_mut().for_each(|butterfly| {
-            let dir_path = Path::new(ASSET_DIRECTORY)
-                .join(&butterfly.dir_name)
-                .join(IMAGE_DIRECTORY);
+        let mut pool = scoped_threadpool::Pool::new(100);
 
-            let url = Url::parse(BUTTERFLY_URL)
-                .unwrap()
-                .join(&butterfly.img_src)
-                .unwrap();
-            if let Ok(img_path) = download_file(&dir_path, url) {
-                trace!(
-                    "Storing image of {} on the path {}",
-                    &butterfly.jp_name,
-                    &img_path
-                );
-                butterfly.img_path.replace(img_path);
-            } else {
-                warn!("Image could not be fetched: {}", &butterfly.jp_name);
-            };
+        info!("Downloading image files");
+
+        pool.scoped(|scope| {
+            self.butterflies.iter_mut().for_each(|butterfly| {
+                let dir_path = Path::new(ASSET_DIRECTORY)
+                    .join(&butterfly.dir_name)
+                    .join(IMAGE_DIRECTORY);
+
+                let url = Url::parse(BUTTERFLY_URL)
+                    .unwrap()
+                    .join(&butterfly.img_src)
+                    .unwrap();
+
+                scope.execute(move || {
+                    if let Ok(img_path) = download_file(&dir_path, url) {
+                        trace!(
+                            "Storing image of {} on the path {}",
+                            &butterfly.jp_name,
+                            &img_path
+                        );
+                        butterfly.img_path.replace(img_path);
+                    } else {
+                        warn!("Image could not be fetched: {}", &butterfly.jp_name);
+                    };
+                });
+            });
         });
+
+        info!("Finished downloading all the images!");
 
         self
     }
@@ -132,6 +147,7 @@ impl ButterflyCollector {
             panic!("Butterfly data has not been extracted yet!")
         }
 
+        info!("Using Google Cloud Vision to collect image property data");
         // Use threadpool
         let mut pool = scoped_threadpool::Pool::new(GCV_THEAD_POOL_NUM);
 
@@ -155,6 +171,8 @@ impl ButterflyCollector {
             }
         });
 
+        info!("All the images has been analyzed");
+
         self
     }
 
@@ -163,6 +181,8 @@ impl ButterflyCollector {
         if self.pdfs.is_empty() {
             panic!("Butterfly data has not been extracted yet!")
         }
+
+        info!("Downloading pdf files");
 
         for (pdf_url, dir_name) in self.pdfs.iter() {
             let dir_path = Path::new(ASSET_DIRECTORY)
@@ -183,6 +203,8 @@ impl ButterflyCollector {
                 }
             }
         }
+
+        info!("Finished downloading all the pdf files!");
 
         self
     }

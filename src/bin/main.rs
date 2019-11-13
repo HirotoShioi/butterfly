@@ -38,11 +38,8 @@ fn main() {
     ]);
 
     let mut butterfly_data = client.collect_datas().unwrap();
-    butterfly_data
-        .fetch_csv_info()
-        .fetch_images()
-        .fetch_pdfs()
-        .fetch_dominant_colors()
-        .store_json()
-        .unwrap();
+    butterfly_data.fetch_csv_info().fetch_images().fetch_pdfs();
+    // .fetch_dominant_colors()
+    // .store_json()
+    // .unwrap();
 }

@@ -126,7 +126,8 @@ impl WebpageParser {
                                         .value()
                                         .attr("href")
                                         .unwrap();
-                                    self.pdfs.insert((href.to_owned(), self.region.to_owned()));
+                                    self.pdfs
+                                        .insert((href.to_owned(), self.dir_name.to_owned()));
                                     self.insert_butterfly(src, href, &color, &category);
                                 } else {
                                     //throw error
