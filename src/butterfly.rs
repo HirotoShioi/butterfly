@@ -98,6 +98,8 @@ impl Butterfly {
     }
 }
 
+// Place it in seperate module
+
 #[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
 pub struct CSVData {
     distribution: String,

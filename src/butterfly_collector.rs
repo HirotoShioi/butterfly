@@ -122,7 +122,9 @@ impl ButterflyCollector {
                     .unwrap();
 
                 scope.execute(move || {
-                    if let Ok(img_path) = download_file(&dir_path, url) {
+                    let file_name = get_file_name(&butterfly.img_src).unwrap();
+                    let file_path = dir_path.join(file_name);
+                    if let Ok(img_path) = download_file(&file_path, url) {
                         trace!(
                             "Storing image of {} on the path {}",
                             &butterfly.jp_name,
@@ -157,9 +159,10 @@ impl ButterflyCollector {
                     .unwrap()
                     .join(&butterfly.img_src)
                     .unwrap();
+
                 scoped.execute(move || match get_dominant_colors(&img_url) {
                     Ok(mut colors) => {
-                        trace!("Managed to get dominant colors {}", butterfly.jp_name);
+                        info!("Analyzed image data of {}", butterfly.jp_name);
                         butterfly.dominant_colors.append(&mut colors);
                     }
                     Err(err) => {
@@ -189,7 +192,9 @@ impl ButterflyCollector {
                 .join(&dir_name)
                 .join(PDF_DIRECTORY);
             let url = Url::parse(BUTTERFLY_URL).unwrap().join(&pdf_url).unwrap();
-            match download_file(&dir_path, url) {
+            let file_name = get_file_name(pdf_url).unwrap();
+            let file_path = dir_path.join(file_name);
+            match download_file(&file_path, url) {
                 Ok(pdf_path) => {
                     for butterfly in self.butterflies.iter_mut() {
                         if &butterfly.pdf_src == pdf_url {
@@ -246,33 +251,17 @@ impl ButterflyCollector {
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
 /// 4. Writing to file failed
-fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
+fn download_file(file_path: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
         return Err(Box::new(ButterflyError::FileNotFound));
     }
 
-    let fname = response
-        .url()
-        .path_segments()
-        .and_then(|segments| segments.last())
-        .and_then(|name| if name.is_empty() { None } else { Some(name) });
-
-    match fname {
-        None => Err(Box::new(ButterflyError::FileNameUnknown)),
-        Some(name) => {
-            let file_path = directory.join(name);
-            //Convert to half-width since some of the are mixed with full and half width
-            //Since we're running on Linux, unwrap() here is fine.
-            let file_path = UCSStr::from_str(&file_path.to_str().unwrap())
-                .narrow()
-                .to_string();
-            let mut out = File::create(&file_path)?;
-            io::copy(&mut response, &mut out)?;
-            Ok(file_path)
-        }
-    }
+    let mut out = File::create(&file_path)?;
+    io::copy(&mut response, &mut out)?;
+    trace!("Downloaded: {:#?}", file_path);
+    Ok(file_path.to_str().unwrap().to_string())
 }
 
 ///Struct used to export data as JSON
@@ -306,4 +295,11 @@ fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
     since_the_epoch.as_secs()
+}
+
+fn get_file_name(url_path: &str) -> Option<String> {
+    url_path
+        .split("/")
+        .last()
+        .map(|name| UCSStr::from_str(name).narrow().to_string())
 }

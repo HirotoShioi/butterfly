@@ -7,8 +7,7 @@ use serde_json::{json, Value};
 use std::fmt;
 use std::fs;
 
-const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
-const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
+use super::constants::*;
 
 /// Get list of `Color` using Google Cloud Vision API
 pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, CloudVisionError> {
@@ -43,7 +42,8 @@ fn use_cloud_vision_api(image_url: &Url) -> Result<Value, CloudVisionError> {
         ]
     });
 
-    let secret_key = fs::read_to_string(API_KEY_FILE_PATH).unwrap();
+    let secret_key = fs::read_to_string(API_KEY_FILE_PATH)
+        .map_err(|_| return KeyFileNotFound(API_KEY_FILE_PATH.to_owned()))?;
 
     let mut response = reqwest::Client::new()
         .post(CLOUD_VISION_URI)
@@ -153,6 +153,7 @@ pub enum CloudVisionError {
     VectorIsEmpty,
     FailedGCV,
     NotJSON,
+    KeyFileNotFound(String),
 }
 
 impl std::error::Error for CloudVisionError {}
@@ -168,6 +169,9 @@ impl fmt::Display for CloudVisionError {
             FailedGCV => String::from("Failed to request Google Cloud Vision API"),
             UnableToFetchImage(url) => format!("Unable to fetch image from url: {}", url),
             NotJSON => String::from("Response body is not JSON"),
+            KeyFileNotFound(filepath) => {
+                format!("Cloud vision api key file not found at: {}", filepath)
+            }
         };
         write!(f, "{}", error_message)
     }

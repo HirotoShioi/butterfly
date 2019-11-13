@@ -8,6 +8,10 @@ pub const IMAGE_DIRECTORY: &str = "images";
 /// Directory which store the pdf files
 pub const PDF_DIRECTORY: &str = "pdf";
 /// Number of threads used for fetching google cloud vision api
-pub const GCV_THEAD_POOL_NUM: u32 = 20;
+pub const GCV_THEAD_POOL_NUM: u32 = 10;
 /// Path to CSV file
 pub const CSV_FILE_PATH: &str = "./butterfly.csv";
+
+pub const CLOUD_VISION_URI: &str = "https://vision.googleapis.com/v1/images:annotate";
+
+pub const API_KEY_FILE_PATH: &str = "./secrets/vision_api.key";
