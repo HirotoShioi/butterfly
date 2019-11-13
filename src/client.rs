@@ -8,9 +8,9 @@ use super::errors::ButterflyError::{self, *};
 use super::webpage_parser::WebpageParser;
 
 /// Client used to retrieve butterfly data
-/// 
+///
 /// You can retrieve data from the Website using `new` then calling `collect_datas`
-/// 
+///
 /// You can also retrieve data from JSON file with `from_path`
 pub struct Client {
     targets: Vec<WebpageParser>,
@@ -35,7 +35,6 @@ impl Client {
 
         ButterflyCollector::from_parse_result(results)
     }
-
 
     /// Retrieve data from JSON file
     pub fn from_path<P: AsRef<Path>>(json_path: P) -> Result<ButterflyCollector, ButterflyError> {

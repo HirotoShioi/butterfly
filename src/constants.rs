@@ -1,3 +1,4 @@
+/// Path to store JSON file
 pub const JSON_FILE_NAME: &str = "butterfly.json";
 /// Url of the website
 pub const BUTTERFLY_URL: &str = "http://biokite.com/worldbutterfly/";

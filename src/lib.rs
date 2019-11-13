@@ -10,7 +10,7 @@
 //! ## How to use
 //!
 //! ### Extracting data from website
-//! 
+//!
 //! Start using this library by defining an instance of `Client` which takes
 //! vector of `WebpageParser`.
 //!  
@@ -44,19 +44,19 @@
 //!    ),
 //!]);
 //! ```
-//! 
+//!
 //! ### Acquiring data via JSON file
-//! 
+//!
 //! If you have done the whole data extraction process before and want to use
 //! the JSON file, you can use `from_path` to retrieve data from it.
-//! 
+//!
 //! ```rust
 //!let mut client = Client::from_path("path_to_json_file");
-//! ``` 
-//! 
-//! 
+//! ```
+//!
+//!
 //! ### Acquire assets based upon the extracted data
-//! 
+//!
 //! After that, call `collect_data` to start collect data from the webpage. This
 //! will return `ButterflyData` struct which can be used to fetch assets such as
 //! jpeg images, pdf files, etc.
@@ -99,6 +99,7 @@ mod butterfly_collector;
 mod client;
 mod cloud_vision;
 mod constants;
+mod csv_data;
 mod errors;
 mod webpage_parser;
 
@@ -108,3 +109,4 @@ pub use client::Client;
 pub use cloud_vision::Color;
 pub use errors::ButterflyError;
 pub use webpage_parser::WebpageParser;
+pub use constants::*;
