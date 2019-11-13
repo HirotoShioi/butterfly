@@ -13,7 +13,7 @@ use super::butterfly::{fetch_csv_data, Butterfly, CSVData, EngName, JPName};
 use super::cloud_vision::get_dominant_colors;
 use super::constants::*;
 use super::errors::ButterflyError::{self, *};
-use super::webpage_parser::WebpageParser;
+use super::webpage_parser::WebpageParseResult;
 
 #[derive(Debug, Clone)]
 ///Set of butterflyies
@@ -24,28 +24,30 @@ pub struct ButterflyCollector {
     pub pdfs: HashSet<(String, String)>,
     /// Datas parsed from csv file
     pub csv_data_map: HashMap<(JPName, EngName), CSVData>,
-    ///
-    pub regions: Vec<String>,
+    /// List of region directories
+    pub region_dirs: Vec<String>,
 }
 
 impl ButterflyCollector {
     pub fn from_path<P: AsRef<Path>>(json_path: P) -> Result<ButterflyCollector, ButterflyError> {
         // Open the file in read-only mode with buffer.
-        let file = File::open(json_path).map_err(|_| JsonFileNotFound)?;
+        let file = File::open(json_path).map_err(|_| return JsonFileNotFound)?;
         let reader = BufReader::new(file);
 
         // Read the JSON contents of the file as an instance of `User`.
         let butterfly_json: ButterflyJSON =
-            serde_json::from_reader(reader).map_err(|_f| FailedToParseJson)?;
+            serde_json::from_reader(reader).map_err(|_f| return FailedToParseJson)?;
 
         butterfly_json.into_collector()
     }
 
-    pub fn new(parse_results: Vec<WebpageParser>) -> Result<ButterflyCollector, ButterflyError> {
+    pub fn from_parse_result(
+        parse_results: Vec<WebpageParseResult>,
+    ) -> Result<ButterflyCollector, ButterflyError> {
         let mut butterflies: Vec<Butterfly> = Vec::new();
         let mut pdfs: HashSet<(String, String)> = HashSet::new();
-        let mut regions: Vec<String> = Vec::new();
-        let csv_data_map = fetch_csv_data().map_err(|_e| FailedToParseCSVRecord)?;
+        let mut region_dirs: Vec<String> = Vec::new();
+        let csv_data_map = fetch_csv_data().map_err(|_e| return FailedToParseCSVRecord)?;
 
         for result in parse_results.into_iter() {
             let mut butterfly_vector = result
@@ -56,7 +58,7 @@ impl ButterflyCollector {
 
             butterflies.append(&mut butterfly_vector);
 
-            regions.push(result.dir_name);
+            region_dirs.push(result.dir_name);
 
             for pdf in result.pdfs.into_iter() {
                 pdfs.insert(pdf);
@@ -67,7 +69,7 @@ impl ButterflyCollector {
             butterflies,
             pdfs,
             csv_data_map,
-            regions,
+            region_dirs,
         })
     }
 
@@ -98,8 +100,8 @@ impl ButterflyCollector {
             panic!("Butterfly data has not been extracted!")
         }
 
-        for region_name in self.regions.iter() {
-            let dir_path = Path::new(ASSET_DIRECTORY).join(region_name.to_owned());
+        for region_dir_name in self.region_dirs.iter() {
+            let dir_path = Path::new(ASSET_DIRECTORY).join(region_dir_name.to_owned());
 
             let img_path = Path::new(&dir_path).join(IMAGE_DIRECTORY);
 
@@ -190,8 +192,8 @@ impl ButterflyCollector {
 
         info!("Downloading pdf files");
 
-        for region_name in self.regions.iter() {
-            let dir_path = Path::new(ASSET_DIRECTORY).join(region_name.to_owned());
+        for region_dir_name in self.region_dirs.iter() {
+            let dir_path = Path::new(ASSET_DIRECTORY).join(region_dir_name.to_owned());
 
             let img_path = Path::new(&dir_path).join(PDF_DIRECTORY);
 
@@ -319,13 +321,13 @@ impl ButterflyJSON {
             butterflies.push(butterfly.to_owned());
         }
 
-        let regions: Vec<String> = regions.into_iter().collect();
+        let region_dirs: Vec<String> = regions.into_iter().collect();
 
         Ok(ButterflyCollector {
             butterflies,
             pdfs,
             csv_data_map,
-            regions,
+            region_dirs,
         })
     }
 }
@@ -340,7 +342,7 @@ fn now() -> u64 {
 
 fn get_file_name(url_path: &str) -> Option<String> {
     url_path
-        .split('/')
+        .split("/")
         .last()
         .map(|name| UCSStr::from_str(name).narrow().to_string())
 }

@@ -91,36 +91,4 @@ pub use butterfly::Butterfly;
 pub use butterfly_collector::ButterflyCollector;
 pub use cloud_vision::Color;
 pub use errors::ButterflyError;
-pub use webpage_parser::WebpageParser;
-
-use log::info;
-
-///Client used to fetch data from the website
-pub struct Client {
-    targets: Vec<WebpageParser>,
-}
-
-impl Client {
-    /// Create an new instance of `Client`
-    pub fn new(targets: Vec<WebpageParser>) -> Client {
-        Client { targets }
-    }
-
-    /// Collect datas from butterfly website
-    pub fn collect_datas(&mut self) -> Result<ButterflyCollector, ButterflyError> {
-        let mut results = Vec::new();
-
-        for target in self.targets.iter_mut() {
-            rayon::scope(|s| {
-                s.spawn(|_| {
-                    info!("Extracting data from: {}", &target.region);
-                    let result = target.fetch_data().unwrap();
-                    results.push(result.to_owned());
-                    info!("Finished extracting data from: {}", &target.region);
-                });
-            });
-        }
-
-        ButterflyCollector::new(results)
-    }
-}
+pub use webpage_parser::{Client, WebpageParser};
