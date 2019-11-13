@@ -1,6 +1,5 @@
-use csv::StringRecord;
 use kanaria::UCSStr;
-use log::{trace, warn};
+use log::{info, trace, warn};
 use reqwest::{StatusCode, Url};
 use scoped_threadpool;
 use serde::{Deserialize, Serialize};
@@ -8,171 +7,74 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::cloud_vision::{get_dominant_colors, Color};
+use super::butterfly::{Butterfly, CSVData, EngName, JPName};
+use super::cloud_vision::get_dominant_colors;
 use super::constants::*;
-use super::errors::ButterflyError;
-
-#[derive(Eq, Debug, PartialEq, Hash, Clone)]
-pub struct JPName(pub String);
-
-#[derive(Eq, Debug, PartialEq, Hash, Clone)]
-pub struct EngName(pub String);
-
-/// Buttterfly struct
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
-pub struct Butterfly {
-    /// Region
-    pub region: String,
-    /// Category
-    pub category: String,
-    /// Url of an image
-    pub img_src: String,
-    /// Url to pdf
-    pub pdf_src: String,
-    /// Path to image
-    pub img_path: Option<String>,
-    /// Path to pdf file
-    pub pdf_path: String,
-    /// Japanese name
-    pub jp_name: String,
-    /// English name
-    pub eng_name: String,
-    /// Background color in 6 digit Hex
-    pub bgcolor: String,
-    pub distribution: String,
-    pub open_length: u32,
-    pub diet: Option<String>,
-    pub remarks: Option<String>,
-    /// List of dominant colors
-    pub dominant_colors: Vec<Color>,
-    pub dir_name: String,
-    pub url: String,
-}
-
-impl Butterfly {
-    /// Creates an instance of `Butterfly`
-    ///
-    /// Initially, `jp_name` and `eng_name` is empty due to the structure of the website
-    pub fn new(
-        region: &str,
-        img_src: &str,
-        pdf_src: &str,
-        bgcolor: &str,
-        category: &str,
-        dirname: &str,
-        url: &str,
-    ) -> Butterfly {
-        Butterfly {
-            region: String::from(region),
-            category: String::from(category),
-            img_src: String::from(img_src),
-            pdf_src: String::from(pdf_src),
-            img_path: None,
-            pdf_path: String::new(),
-            jp_name: String::new(),
-            eng_name: String::new(),
-            bgcolor: String::from(bgcolor),
-            dominant_colors: Vec::new(),
-            distribution: String::new(),
-            dir_name: String::from(dirname),
-            url: String::from(url),
-            open_length: 0,
-            diet: None,
-            remarks: None,
-        }
-    }
-
-    ///Add both English and Japanese name to given `Butterfly`
-    pub fn add_names(&mut self, jp_name: &str, eng_name: &str) -> bool {
-        if self.jp_name.is_empty() {
-            let fixed_eng_name = UCSStr::from_str(eng_name).narrow().to_string();
-            let fixed_jp_name = UCSStr::from_str(&jp_name)
-                .wide()
-                .to_string()
-                .replace("\u{3000}", "");
-            self.jp_name.push_str(&fixed_jp_name);
-            self.eng_name.push_str(&fixed_eng_name);
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn add_additional_data(&mut self, csv_data: &CSVData) {
-        self.distribution = csv_data.distribution.to_owned();
-        self.open_length = csv_data.open_length;
-        self.diet = csv_data.diet.to_owned();
-        self.remarks = csv_data.remarks.to_owned();
-    }
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Clone, Serialize, Deserialize)]
-pub struct CSVData {
-    distribution: String,
-    open_length: u32,
-    diet: Option<String>,
-    remarks: Option<String>,
-}
-
-impl CSVData {
-    pub fn new(vec: StringRecord) -> Option<((JPName, EngName), CSVData)> {
-        let eng_name = vec.get(0)?;
-        let jp_name = vec.get(1)?;
-        let open_length = vec.get(3).and_then(|num| {
-            let parsed: Option<u32> = num.parse().ok();
-            parsed
-        })?;
-
-        let distribution = vec.get(4).map(|v| v.to_owned())?;
-
-        let diet = vec.get(5).and_then(|d| {
-            if d.is_empty() {
-                None
-            } else {
-                Some(d.to_owned())
-            }
-        });
-        let remarks = vec.get(6).and_then(|r| {
-            if r.is_empty() {
-                None
-            } else {
-                Some(r.to_owned())
-            }
-        });
-
-        let csv_data = CSVData {
-            distribution,
-            open_length,
-            diet,
-            remarks,
-        };
-
-        Some((
-            (JPName(jp_name.to_owned()), EngName(eng_name.to_owned())),
-            csv_data,
-        ))
-    }
-}
+use super::errors::ButterflyError::{self, *};
+use super::webpage_parser::WebpageParser;
 
 ///Set of butterflyies
 #[derive(Debug, Clone)]
-pub struct ButterflyRegion {
-    /// Directory used to store assets
-    pub dir_name: String,
-    /// Name of the region
-    pub region: String,
-    /// Url of region page
-    pub url: String,
+pub struct ButterflyCollector {
     /// Collections of butterflies
     pub butterflies: Vec<Butterfly>,
     /// Pdf collection
-    pub pdfs: HashSet<String>,
+    pub pdfs: HashSet<(String, String)>,
     /// Datas parsed from csv file
     pub csv_data_map: HashMap<(JPName, EngName), CSVData>,
+    // thread pool here
 }
 
-impl ButterflyRegion {
+impl ButterflyCollector {
+    pub fn new(parse_results: Vec<WebpageParser>) -> Result<ButterflyCollector, ButterflyError> {
+        let mut butterflies: Vec<Butterfly> = Vec::new();
+        let mut pdfs: HashSet<(String, String)> = HashSet::new();
+        let mut csv_data_map = HashMap::new();
+        // Read file
+        let mut cvs_file_content =
+            csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
+
+        for record in cvs_file_content.records() {
+            let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
+            if let Some((key, csv_data)) = CSVData::new(record) {
+                csv_data_map.insert(key, csv_data);
+            } else {
+                return Err(FailedToParseCSVRecord);
+            };
+        }
+
+        for result in parse_results.into_iter() {
+            let mut butterfly_vector = result
+                .butterflies
+                .values()
+                .map(|v| v.to_owned())
+                .collect::<Vec<Butterfly>>();
+
+            butterflies.append(&mut butterfly_vector);
+
+            let dir_path = Path::new(ASSET_DIRECTORY)
+                .join(result.dir_name.to_owned())
+                .join(PDF_DIRECTORY);
+
+            if create_dir_all(&dir_path).is_err() {
+                remove_dir_all(&dir_path).unwrap();
+                create_dir_all(&dir_path).unwrap();
+            };
+
+            for pdf in result.pdfs.into_iter() {
+                pdfs.insert(pdf);
+            }
+        }
+
+        Ok(ButterflyCollector {
+            butterflies,
+            pdfs,
+            csv_data_map,
+        })
+    }
+
     /// Fetch data from CSV data map
     pub fn fetch_csv_info(&mut self) -> &mut Self {
         for butterfly in self.butterflies.iter_mut() {
@@ -200,16 +102,11 @@ impl ButterflyRegion {
             panic!("Butterfly data has not been extracted!")
         }
 
-        let dir_path = Path::new(ASSET_DIRECTORY)
-            .join(&self.dir_name)
-            .join(IMAGE_DIRECTORY);
-
-        if create_dir_all(&dir_path).is_err() {
-            remove_dir_all(&dir_path).unwrap();
-            create_dir_all(&dir_path).unwrap();
-        };
-
         self.butterflies.iter_mut().for_each(|butterfly| {
+            let dir_path = Path::new(ASSET_DIRECTORY)
+                .join(&butterfly.dir_name)
+                .join(IMAGE_DIRECTORY);
+
             let url = Url::parse(BUTTERFLY_URL)
                 .unwrap()
                 .join(&butterfly.img_src)
@@ -267,16 +164,10 @@ impl ButterflyRegion {
             panic!("Butterfly data has not been extracted yet!")
         }
 
-        let dir_path = Path::new(ASSET_DIRECTORY)
-            .join(&self.dir_name)
-            .join(PDF_DIRECTORY);
-
-        if create_dir_all(&dir_path).is_err() {
-            remove_dir_all(&dir_path).unwrap();
-            create_dir_all(&dir_path).unwrap();
-        };
-
-        for pdf_url in self.pdfs.iter() {
+        for (pdf_url, dir_name) in self.pdfs.iter() {
+            let dir_path = Path::new(ASSET_DIRECTORY)
+                .join(&dir_name)
+                .join(PDF_DIRECTORY);
             let url = Url::parse(BUTTERFLY_URL).unwrap().join(&pdf_url).unwrap();
             match download_file(&dir_path, url) {
                 Ok(pdf_path) => {
@@ -294,6 +185,34 @@ impl ButterflyRegion {
         }
 
         self
+    }
+
+    pub fn store_json(&mut self) -> Result<(), std::io::Error> {
+        let dir_path = Path::new(ASSET_DIRECTORY);
+
+        if create_dir_all(&dir_path).is_err() {
+            remove_dir_all(&dir_path)?;
+            create_dir_all(&dir_path)?;
+        };
+
+        info!(
+            "Storing the results to json file on: {}",
+            &dir_path.to_str().unwrap()
+        );
+
+        let butterfly_num: usize = self.butterflies.len();
+        let pdf_num: usize = self.butterflies.len();
+        // Remove duplicates
+        self.butterflies
+            .sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
+        self.butterflies
+            .dedup_by(|b1, b2| b1.jp_name == b2.jp_name && b1.eng_name == b2.eng_name);
+
+        let butterfly_json = ButterflyJSON::new(&self.butterflies, butterfly_num, pdf_num);
+        let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
+        serde_json::to_writer_pretty(json_file, &butterfly_json)?;
+
+        Ok(())
     }
 }
 
@@ -332,4 +251,37 @@ fn download_file(directory: &PathBuf, url: Url) -> Result<String, Box<dyn std::e
             Ok(file_path)
         }
     }
+}
+
+///Struct used to export data as JSON
+#[derive(Deserialize, Serialize, Debug, PartialEq, PartialOrd, Clone)]
+pub struct ButterflyJSON {
+    /// List of butterflies
+    pub butterflies: Vec<Butterfly>,
+    /// Number of butterfly data
+    pub butterfly_num: usize,
+    /// Number of pdf files
+    pub pdf_num: usize,
+    pub created_at: u64,
+}
+
+impl ButterflyJSON {
+    fn new(butterflies: &[Butterfly], butterfly_num: usize, pdf_num: usize) -> Self {
+        let created_at = now();
+
+        ButterflyJSON {
+            butterflies: butterflies.to_owned(),
+            butterfly_num,
+            pdf_num,
+            created_at,
+        }
+    }
+}
+
+fn now() -> u64 {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    since_the_epoch.as_secs()
 }

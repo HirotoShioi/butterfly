@@ -37,7 +37,7 @@ fn main() {
         ),
     ]);
 
-    let mut butterfly_data = client.collect_datas();
+    let mut butterfly_data = client.collect_datas().unwrap();
     butterfly_data
         .fetch_csv_info()
         .fetch_images()

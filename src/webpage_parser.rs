@@ -2,7 +2,7 @@ use log::error;
 use scraper::{ElementRef, Html, Selector};
 use std::collections::{HashMap, HashSet};
 
-use super::butterfly::{new_region, Butterfly, ButterflyRegion};
+use super::butterfly::Butterfly;
 use super::errors::ButterflyError;
 
 // Encoding used on the butterfly website
@@ -22,7 +22,7 @@ pub struct WebpageParser {
     /// Collections of butterflies
     pub butterflies: HashMap<Id, Butterfly>,
     /// Pdf collection
-    pub pdfs: HashSet<String>,
+    pub pdfs: HashSet<(String, String)>,
 }
 
 impl WebpageParser {
@@ -39,23 +39,11 @@ impl WebpageParser {
     }
 
     /// Extract informations of butterflies from `url`
-    pub fn fetch_data(&mut self) -> Result<ButterflyRegion, ButterflyError> {
+    pub fn fetch_data(&mut self) -> Result<&mut Self, ButterflyError> {
         let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
         self.parse_page(&body)?;
 
-        let butterfly_vector = self
-            .butterflies
-            .values()
-            .map(|v| v.to_owned())
-            .collect::<Vec<Butterfly>>();
-
-        new_region(
-            &self.dir_name,
-            &self.region,
-            &self.url,
-            &butterfly_vector,
-            &self.pdfs,
-        )
+        Ok(self)
     }
 
     /// Insert new `Butterfly` to `butterflies`
@@ -69,7 +57,15 @@ impl WebpageParser {
         let id = self.butterflies.len();
         match self.butterflies.insert(
             id,
-            Butterfly::new(&self.region, img_src, pdf_src, color, category),
+            Butterfly::new(
+                &self.region,
+                img_src,
+                pdf_src,
+                color,
+                category,
+                &self.dir_name,
+                &self.url,
+            ),
         ) {
             Some(_old_val) => None,
             None => Some(self),
@@ -130,7 +126,7 @@ impl WebpageParser {
                                         .value()
                                         .attr("href")
                                         .unwrap();
-                                    self.pdfs.insert(href.to_owned());
+                                    self.pdfs.insert((href.to_owned(), self.region.to_owned()));
                                     self.insert_butterfly(src, href, &color, &category);
                                 } else {
                                     //throw error
