@@ -85,6 +85,7 @@
 extern crate csv;
 extern crate env_logger;
 extern crate hex;
+extern crate kana;
 extern crate kanaria;
 extern crate log;
 extern crate rayon;
@@ -107,6 +108,6 @@ pub use butterfly::Butterfly;
 pub use butterfly_collector::ButterflyCollector;
 pub use client::Client;
 pub use cloud_vision::Color;
+pub use constants::*;
 pub use errors::ButterflyError;
 pub use webpage_parser::WebpageParser;
-pub use constants::*;
