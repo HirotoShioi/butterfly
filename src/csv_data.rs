@@ -1,4 +1,5 @@
 use csv::StringRecord;
+use kana;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -36,14 +37,14 @@ impl CSVData {
             if d.is_empty() {
                 None
             } else {
-                Some(d.to_owned())
+                Some(normalize(d))
             }
         });
         let remarks = vec.get(6).and_then(|r| {
             if r.is_empty() {
                 None
             } else {
-                Some(r.to_owned())
+                Some(normalize(r))
             }
         });
 
@@ -77,4 +78,10 @@ pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, Butterfly
     }
 
     Ok(csv_data_map)
+}
+
+pub fn normalize(text: &str) -> String {
+    let result = kana::wide2ascii(text);
+    let result = kana::nowidespace(&result);
+    kana::half2kana(&result)
 }
