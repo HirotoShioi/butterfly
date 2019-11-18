@@ -31,7 +31,7 @@ impl CSVData {
             parsed
         })?;
 
-        let distribution = vec.get(4).map(|v| v.to_owned())?;
+        let distribution = vec.get(4).map(|v| normalize(v))?;
 
         let diet = vec.get(5).and_then(|d| {
             if d.is_empty() {
