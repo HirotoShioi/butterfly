@@ -24,13 +24,19 @@ pub struct Butterfly {
     pub eng_name: String,
     /// Background color in 6 digit Hex
     pub bgcolor: String,
+    /// Distribution
     pub distribution: String,
+    /// Length of the butterfly
     pub open_length: u32,
+    /// Food they eat
     pub diet: Option<String>,
+    /// Remarks if any
     pub remarks: Option<String>,
     /// List of dominant colors
     pub dominant_colors: Vec<Color>,
+    /// Directory to store the assets
     pub dir_name: String,
+    /// Url
     pub url: String,
 }
 

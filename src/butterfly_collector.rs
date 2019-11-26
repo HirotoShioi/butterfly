@@ -19,7 +19,7 @@ use super::butterfly::Butterfly;
 use super::cloud_vision::get_dominant_colors;
 use super::constants::*;
 use super::csv_data::{fetch_csv_data, CSVData, EngName, JPName};
-use super::errors::ButterflyError::{self, *};
+use super::errors::ButterflyError;
 use super::webpage_parser::WebpageParseResult;
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ impl ButterflyCollector {
         let mut butterflies: Vec<Butterfly> = Vec::new();
         let mut pdfs: HashSet<(String, String)> = HashSet::new();
         let mut region_dirs: Vec<String> = Vec::new();
-        let csv_data_map = fetch_csv_data().map_err(|_e| return FailedToParseCSVRecord)?;
+        let csv_data_map = fetch_csv_data()?;
 
         for result in parse_results.into_iter() {
             let mut butterfly_vector = result
@@ -246,12 +246,11 @@ impl ButterflyCollector {
         );
 
         let butterfly_num: usize = self.butterflies.len();
-        let pdf_num: usize = self.butterflies.len();
+        let pdf_num: usize = self.pdfs.len();
         // Remove duplicates
         self.butterflies
             .sort_by(|b1, b2| b1.jp_name.cmp(&b2.jp_name));
-        self.butterflies
-            .dedup_by(|b1, b2| b1.jp_name == b2.jp_name && b1.eng_name == b2.eng_name);
+        self.butterflies.dedup_by(|b1, b2| b1.jp_name == b2.jp_name);
 
         let butterfly_json = ButterflyJSON::new(&self.butterflies, butterfly_num, pdf_num);
         let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
@@ -269,11 +268,13 @@ impl ButterflyCollector {
 /// 2. Image name is unknown (very unlikely to happen)
 /// 3. File could not be created
 /// 4. Writing to file failed
-fn download_file(file_path: &PathBuf, url: Url) -> Result<String, Box<dyn std::error::Error>> {
+fn download_file(file_path: &PathBuf, url: Url) -> anyhow::Result<String> {
     let mut response = reqwest::get(url)?;
 
     if response.status() != StatusCode::OK {
-        return Err(Box::new(ButterflyError::FileNotFound));
+        anyhow::bail!(ButterflyError::FileNotFound(
+            file_path.to_str().unwrap().to_string(),
+        ));
     }
 
     let mut out = File::create(&file_path)?;
@@ -310,7 +311,7 @@ impl ButterflyJSON {
 
     /// Convert itself into `ButterflyCollector`
     pub fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
-        let csv_data_map = fetch_csv_data().map_err(|_| FailedToParseCSVRecord)?;
+        let csv_data_map = fetch_csv_data()?;
 
         let mut regions: HashSet<String> = HashSet::new();
         let mut butterflies: Vec<Butterfly> = Vec::new();

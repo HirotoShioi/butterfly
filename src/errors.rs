@@ -1,54 +1,36 @@
-use std::fmt;
-
-use super::errors::ButterflyError::*;
+use thiserror::Error;
 
 /// List of errors that could occur when processing data
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ButterflyError {
     /// Image source was not found when extracting
+    #[error("Image source not found when parsing the page")]
     ImageSourceNotFound,
     /// Text data was not found when extracting
+    #[error("Text description of a butterfly could not be extracted")]
     TextNotFound,
     /// Butterfly was not found
+    #[error("Index of given butterfly does not exist")]
     InvalidIndexButterflyNotFound,
     /// Failed to fetch html data
-    FailedToFetchHTML,
-    /// Image was not found
-    ImageNotFound,
+    #[error("Failed to fetch html: {0}")]
+    FailedToFetchHTML(String),
     /// Name of the image is unknown
+    #[error("Image name unknown")]
     ImageNameUnknown,
-    /// Given data is not a image file
-    NotImage,
     /// Failed to parse CSV file
-    FailedToParseCSVRecord,
+    #[error("Failed to parse CSV record")]
+    FailedToParseCSVRecord(String),
     /// File not found
-    FileNotFound,
+    #[error("File not found: {0}")]
+    FileNotFound(String),
     /// File name was unknown
+    #[error("File name unknown")]
     FileNameUnknown,
     /// JSON file not found
-    JsonFileNotFound,
+    #[error("JSON file not found: {0}")]
+    JsonFileNotFound(String),
     /// Failed to parse JSON file
-    FailedToParseJson,
-}
-
-impl std::error::Error for ButterflyError {}
-
-impl fmt::Display for ButterflyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        let error_message = match self {
-            ImageSourceNotFound => "Image source not found",
-            FailedToFetchHTML => "Failed to fetch html",
-            InvalidIndexButterflyNotFound => "Index of given butterfly does not exist",
-            TextNotFound => "Text description of a butterfly could not be extracted",
-            ImageNotFound => "Image could not be fetched",
-            ImageNameUnknown => "Image name unknown",
-            NotImage => "Downloaded file is not image file",
-            FailedToParseCSVRecord => "Failed to parse CSV record",
-            FileNameUnknown => "File name unknown",
-            FileNotFound => "File not found",
-            JsonFileNotFound => "JSON file not found",
-            FailedToParseJson => "Failed to parse JSON file",
-        };
-        write!(f, "{}", error_message)
-    }
+    #[error("Failed to parse JSON file: {0}")]
+    FailedToParseJson(String),
 }

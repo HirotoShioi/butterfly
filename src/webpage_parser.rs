@@ -183,7 +183,8 @@ impl WebpageParser {
 
     /// Extract informations of butterflies from `url`
     pub fn fetch_data(&mut self) -> Result<WebpageParseResult, ButterflyError> {
-        let body = request_html(&self.url).map_err(|_e| ButterflyError::FailedToFetchHTML)?;
+        let body = request_html(&self.url)
+            .map_err(|_e| ButterflyError::FailedToFetchHTML(self.url.clone()))?;
         let mut result = WebpageParseResult::new(self);
         result.parse_page(&body)?;
 

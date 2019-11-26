@@ -1,7 +1,6 @@
 use log::info;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
 
 use super::butterfly_collector::{ButterflyCollector, ButterflyJSON};
 use super::errors::ButterflyError::{self, *};
@@ -28,7 +27,9 @@ impl Client {
 
         for target in self.targets.iter_mut() {
             info!("Extracting data from: {}", &target.region);
-            let result = target.fetch_data().map_err(|_| FailedToFetchHTML)?;
+            let result = target
+                .fetch_data()
+                .map_err(|_| FailedToFetchHTML(target.url.clone()))?;
             results.push(result.to_owned());
             info!("Finished extracting data from: {}", &target.region);
         }
@@ -37,14 +38,15 @@ impl Client {
     }
 
     /// Retrieve data from JSON file
-    pub fn from_path<P: AsRef<Path>>(json_path: P) -> Result<ButterflyCollector, ButterflyError> {
+    pub fn from_path(json_path: &str) -> Result<ButterflyCollector, ButterflyError> {
         // Open the file in read-only mode with buffer.
-        let file = File::open(json_path).map_err(|_| return JsonFileNotFound)?;
+        let file =
+            File::open(json_path).map_err(|_e| return JsonFileNotFound(json_path.to_string()))?;
         let reader = BufReader::new(file);
 
         // Read the JSON contents of the file as an instance of `User`.
-        let butterfly_json: ButterflyJSON =
-            serde_json::from_reader(reader).map_err(|_f| return FailedToParseJson)?;
+        let butterfly_json: ButterflyJSON = serde_json::from_reader(reader)
+            .map_err(|_f| return FailedToParseJson(json_path.to_string()))?;
 
         butterfly_json.into_collector()
     }
