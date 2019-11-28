@@ -66,14 +66,16 @@ impl CSVData {
 pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, ButterflyError> {
     let mut csv_data_map = HashMap::new();
     // Read file
-    let mut cvs_file_content = csv::Reader::from_path(CSV_FILE_PATH).expect("CSV file not found");
+    let mut cvs_file_content = csv::Reader::from_path(CSV_FILE_PATH)
+        .map_err(|_e| FileNotFound(CSV_FILE_PATH.to_owned()))?;
 
     for record in cvs_file_content.records() {
-        let record = record.or_else(|_err| Err(FailedToParseCSVRecord))?;
+        let record =
+            record.or_else(|_err| Err(FailedToParseCSVRecord(CSV_FILE_PATH.to_string())))?;
         if let Some((key, csv_data)) = CSVData::new(record) {
             csv_data_map.insert(key, csv_data);
         } else {
-            return Err(FailedToParseCSVRecord);
+            return Err(FailedToParseCSVRecord(CSV_FILE_PATH.to_string()));
         };
     }
 

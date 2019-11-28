@@ -58,7 +58,7 @@
 //! ### Acquire assets based upon the extracted data
 //!
 //! After that, call `collect_data` to start collect data from the webpage. This
-//! will return `ButterflyData` struct which can be used to fetch assets such as
+//! will return `ButterflyCollector` struct which can be used to fetch assets such as
 //! jpeg images, pdf files, etc.
 //!
 //! ```rust
@@ -82,6 +82,7 @@
 //!    .unwrap();
 //! ```
 
+extern crate anyhow;
 extern crate csv;
 extern crate env_logger;
 extern crate hex;
@@ -94,6 +95,7 @@ extern crate scoped_threadpool;
 extern crate scraper;
 extern crate serde;
 extern crate serde_json;
+extern crate thiserror;
 
 mod butterfly;
 mod butterfly_collector;
