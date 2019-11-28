@@ -10,7 +10,7 @@ use std::fs;
 use super::constants::*;
 
 /// Get list of `Color` using Google Cloud Vision API
-pub fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, CloudVisionError> {
+pub(crate) fn get_dominant_colors(image_url: &Url) -> Result<Vec<Color>, CloudVisionError> {
     let response_json = use_cloud_vision_api(image_url)?;
     let extracted_color_vec = extract_colors(&response_json)?;
 

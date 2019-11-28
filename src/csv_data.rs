@@ -23,7 +23,7 @@ pub struct EngName(pub String);
 
 impl CSVData {
     /// Create an new instance of `CSVData`
-    pub fn new(vec: StringRecord) -> Option<((JPName, EngName), CSVData)> {
+    pub(crate) fn new(vec: StringRecord) -> Option<((JPName, EngName), CSVData)> {
         let eng_name = vec.get(0)?;
         let jp_name = vec.get(1)?;
         let open_length = vec.get(3).and_then(|num| {
@@ -63,7 +63,7 @@ impl CSVData {
 }
 
 /// Fetch `CSVData` from CSV file in which the filepath is `CSV_FILE_PATH`
-pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, ButterflyError> {
+pub(crate) fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, ButterflyError> {
     let mut csv_data_map = HashMap::new();
     // Read file
     let mut cvs_file_content = csv::Reader::from_path(CSV_FILE_PATH)
@@ -82,7 +82,7 @@ pub fn fetch_csv_data() -> Result<HashMap<(JPName, EngName), CSVData>, Butterfly
     Ok(csv_data_map)
 }
 
-pub fn normalize(text: &str) -> String {
+pub(crate) fn normalize(text: &str) -> String {
     let result = kana::wide2ascii(text);
     let result = kana::nowidespace(&result);
     kana::half2kana(&result)

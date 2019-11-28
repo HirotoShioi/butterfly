@@ -44,7 +44,7 @@ impl Butterfly {
     /// Creates an instance of `Butterfly`
     ///
     /// Initially, `jp_name` and `eng_name` is empty due to the structure of the website
-    pub fn new(
+    pub(crate) fn new(
         region: &str,
         img_src: &str,
         pdf_src: &str,
@@ -74,7 +74,7 @@ impl Butterfly {
     }
 
     ///Add both English and Japanese name to given `Butterfly`
-    pub fn add_names(&mut self, jp_name: &str, eng_name: &str) -> bool {
+    pub(crate) fn add_names(&mut self, jp_name: &str, eng_name: &str) -> bool {
         if self.jp_name.is_empty() {
             let fixed_eng_name = UCSStr::from_str(eng_name).narrow().to_string();
             let fixed_jp_name = UCSStr::from_str(&jp_name)
@@ -90,7 +90,7 @@ impl Butterfly {
     }
 
     /// Add datas from CSV file
-    pub fn add_csv_data(&mut self, csv_data: &CSVData) {
+    pub(crate) fn add_csv_data(&mut self, csv_data: &CSVData) {
         self.distribution = csv_data.distribution.to_owned();
         self.open_length = csv_data.open_length;
         self.diet = csv_data.diet.to_owned();
