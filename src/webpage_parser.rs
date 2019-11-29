@@ -161,7 +161,7 @@ impl WebpageParseResult {
 }
 
 /// This struct is used to initialize web parsing extraction process
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
 pub struct WebpageParser {
     /// Directory name to store assets
     pub dir_name: String,
@@ -173,6 +173,14 @@ pub struct WebpageParser {
 
 impl WebpageParser {
     /// Create an instance of `ButterflyRegion`
+    ///
+    /// ```rust
+    /// WebpageParser::new(
+    ///     "old_north",
+    ///     "旧北区",
+    ///     "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall"
+    /// )
+    /// ```
     pub fn new(dir_name: &str, region: &str, url: &str) -> WebpageParser {
         WebpageParser {
             dir_name: dir_name.to_string(),
@@ -182,7 +190,7 @@ impl WebpageParser {
     }
 
     /// Extract informations of butterflies from `url`
-    pub fn fetch_data(&mut self) -> Result<WebpageParseResult, ButterflyError> {
+    pub(crate) fn fetch_data(&mut self) -> Result<WebpageParseResult, ButterflyError> {
         let body = request_html(&self.url)
             .map_err(|_e| ButterflyError::FailedToFetchHTML(self.url.clone()))?;
         let mut result = WebpageParseResult::new(self);

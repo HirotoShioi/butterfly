@@ -1,8 +1,8 @@
 //! # butterfly_extractor
 //!
 //! This crate attempts to extract data from http://biokite.com/worldbutterfly/butterfly-index.htm
-//! Data include images, pdfs, both japanese and English name, as well as
-//! background color it is being used.
+//! Data include images, pdfs, both Japanese and English name, as well as
+//! background color that is being used.
 //!
 //! We are also using [Google Cloud Vision API](https://cloud.google.com/vision/?hl=ja)
 //! to extract colors from the images
@@ -110,6 +110,5 @@ pub use butterfly::Butterfly;
 pub use butterfly_collector::ButterflyCollector;
 pub use client::Client;
 pub use cloud_vision::Color;
-pub use constants::*;
 pub use errors::ButterflyError;
 pub use webpage_parser::WebpageParser;

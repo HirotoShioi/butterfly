@@ -42,7 +42,7 @@ pub struct ButterflyCollector {
 
 impl ButterflyCollector {
     /// Create new instance of `ButterflyCollector` from given `Vec<WebpageParseResult>`
-    pub fn from_parse_result(
+    pub(crate) fn from_parse_result(
         parse_results: Vec<WebpageParseResult>,
     ) -> Result<ButterflyCollector, ButterflyError> {
         let mut butterflies: Vec<Butterfly> = Vec::new();
@@ -310,7 +310,7 @@ impl ButterflyJSON {
     }
 
     /// Convert itself into `ButterflyCollector`
-    pub fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
+    pub(crate) fn into_collector(self) -> Result<ButterflyCollector, ButterflyError> {
         let csv_data_map = fetch_csv_data()?;
 
         let mut regions: HashSet<String> = HashSet::new();

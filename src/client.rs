@@ -17,11 +17,51 @@ pub struct Client {
 
 impl Client {
     /// Create an new instance of `Client`
+    ///
+    ///```rust
+    ///let mut client = Client::new(vec![
+    ///    WebpageParser::new(
+    ///        "old_north",
+    ///        "旧北区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall",
+    ///    ),
+    ///    WebpageParser::new(
+    ///        "new_north",
+    ///        "新北区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-NArc.htm#NAsa",
+    ///    ),
+    ///    WebpageParser::new(
+    ///        "new_tropical",
+    ///        "新熱帯区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-NTro.htm#NTmap",
+    ///    ),
+    ///    WebpageParser::new(
+    ///        "india_australia",
+    ///        "インド・オーストラリア区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-IOrs.htm#IOmap",
+    ///    ),
+    ///    WebpageParser::new(
+    ///        "tropical_africa",
+    ///        "熱帯アフリカ区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-TAfr.htm#TAmaps",
+    ///    ),
+    ///]);
+    ///```
     pub fn new(targets: Vec<WebpageParser>) -> Client {
         Client { targets }
     }
 
     /// Collect datas from butterfly website
+    ///
+    ///```rust
+    /// let mut client = Client::new(vec![
+    ///    WebpageParser::new(
+    ///        "old_north",
+    ///        "旧北区",
+    ///        "http://biokite.com/worldbutterfly/butterfly-PArc.htm#PAall",
+    ///    )]);
+    /// let result = client.collect_datas.unwrap();
+    ///```
     pub fn collect_datas(&mut self) -> Result<ButterflyCollector, ButterflyError> {
         let mut results = Vec::new();
 
@@ -38,6 +78,10 @@ impl Client {
     }
 
     /// Retrieve data from JSON file
+    ///
+    /// ```rust
+    ///     let result = Client::from_path("path_to_json").unwrap();
+    /// ```
     pub fn from_path(json_path: &str) -> Result<ButterflyCollector, ButterflyError> {
         // Open the file in read-only mode with buffer.
         let file =
