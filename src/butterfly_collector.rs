@@ -232,18 +232,8 @@ impl ButterflyCollector {
     }
 
     /// Store the result as JSON file as `JSON_FILE_NAME`
-    pub fn store_json(&mut self) -> Result<(), std::io::Error> {
-        let dir_path = Path::new(ASSET_DIRECTORY);
-
-        if create_dir_all(&dir_path).is_err() {
-            remove_dir_all(&dir_path)?;
-            create_dir_all(&dir_path)?;
-        };
-
-        info!(
-            "Storing the results to json file on: {}",
-            &dir_path.to_str().unwrap()
-        );
+    pub fn store_json(&mut self, file_path: &str) -> Result<(), std::io::Error> {
+        info!("Storing information into json file: {}", file_path);
 
         let butterfly_num: usize = self.butterflies.len();
         let pdf_num: usize = self.pdfs.len();
@@ -253,7 +243,7 @@ impl ButterflyCollector {
         self.butterflies.dedup_by(|b1, b2| b1.jp_name == b2.jp_name);
 
         let butterfly_json = ButterflyJSON::new(&self.butterflies, butterfly_num, pdf_num);
-        let json_file = File::create(dir_path.join(JSON_FILE_NAME))?;
+        let json_file = File::create(file_path)?;
         serde_json::to_writer_pretty(json_file, &butterfly_json)?;
 
         Ok(())
